@@ -3,13 +3,16 @@ import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
 import QtCharts 2.15
 import QtGraphicalEffects 1.15
+import "." // 确保Theme单例已导入
 
+// SensorDataPanel.qml - 传感器数据显示面板
 Rectangle {
     id: sensorDataPanel
-    color: darkColor
+    // color: darkColor // 旧的硬编码背景色
+    color: Theme.darkThemeBackgroundColor // 使用Theme中的深色背景
 
     // 属性定义
-    property var selectedSensor: null
+    property var selectedSensor: null // 当前选中的传感器对象
     property real startTime: 0
 
     // 传感器数据结构
@@ -26,7 +29,7 @@ Rectangle {
                     status: 0,
                     // warningThreshold: 1000, // 旧的硬编码阈值，将被动态加载
                     // criticalThreshold: 2000, // 旧的硬编码阈值，将被动态加载
-                    chartColor: accentColor,
+                    chartColor: Theme.primaryColor, // 使用Theme主色调
                     dataArray: []
                 },
                 {
@@ -38,21 +41,19 @@ Rectangle {
                     status: 0,
                     // warningThreshold: 0.08, // 旧的硬编码阈值
                     // criticalThreshold: 0.1,   // 旧的硬编码阈值
-                    chartColor: accentColor,
+                    chartColor: Theme.primaryColor,
                     dataArray: []
                 },
                 {
                     name: "TVOC",
                     value: 0,
-                    unit: "ppb",
+                    unit: "ppb", // 注意: 单位与DTO不一致，initializeSensors中做了转换
                     type: "air",
                     dataKey: "tvoc",
                     status: 0,
                     // warningThreshold: 500, // 旧的硬编码阈值 (ppb)
                     // criticalThreshold: 800, // 旧的硬编码阈值 (ppb)
-                    // 注意: DTO的tvoc单位是mg/m³, SensorModule暴露的limit是ppb. QML中需要转换或SensorModule提供转换后的limit.
-                    // 为了演示，这里假设QML将处理单位或SensorModule提供了匹配单位的limit.
-                    chartColor: accentColor,
+                    chartColor: Theme.primaryColor,
                     dataArray: []
                 },
                 {
@@ -64,7 +65,7 @@ Rectangle {
                     status: 0,
                     // warningThreshold: 75,  // 旧的硬编码阈值
                     // criticalThreshold: 150, // 旧的硬编码阈值
-                    chartColor: accentColor,
+                    chartColor: Theme.primaryColor,
                     dataArray: []
                 },
                 {
@@ -76,7 +77,7 @@ Rectangle {
                     status: 0,
                     // warningThreshold: 150, // 旧的硬编码阈值
                     // criticalThreshold: 250, // 旧的硬编码阈值
-                    chartColor: accentColor,
+                    chartColor: Theme.primaryColor,
                     dataArray: []
                 },
                 {
@@ -86,9 +87,9 @@ Rectangle {
                     type: "air",
                     dataKey: "airTemperature",
                     status: 0,
-                    warningThreshold: 0,
+                    warningThreshold: 0, // 通常温度没有固定阈值，或根据需求设定
                     criticalThreshold: 0,
-                    chartColor: accentColor,
+                    chartColor: Theme.primaryColor,
                     dataArray: []
                 },
                 {
@@ -96,11 +97,11 @@ Rectangle {
                     value: 0,
                     unit: "%",
                     type: "air",
-                    dataKey: "humidity",
+                    dataKey: "humidity", // 对应DTO的airHumidity
                     status: 0,
-                    warningThreshold: 0,
+                    warningThreshold: 0, // 湿度通常也没有固定阈值
                     criticalThreshold: 0,
-                    chartColor: accentColor,
+                    chartColor: Theme.primaryColor,
                     dataArray: []
                 }
             ]
@@ -117,7 +118,7 @@ Rectangle {
                     status: 0,
                     // warningThreshold: 5,   // 旧的硬编码阈值
                     // criticalThreshold: 20,  // 旧的硬编码阈值
-                    chartColor: "#3498DB",
+                    chartColor: Theme.secondaryColor, // 使用Theme次要色
                     dataArray: []
                 },
                 {
@@ -129,7 +130,7 @@ Rectangle {
                     status: 0,
                     // warningThreshold: 8.5, // 旧的硬编码阈值
                     // criticalThreshold: 9.0, // 旧的硬编码阈值
-                    chartColor: "#3498DB",
+                    chartColor: Theme.secondaryColor,
                     dataArray: []
                 },
                 {
@@ -141,7 +142,7 @@ Rectangle {
                     status: 0,
                     // warningThreshold: 500,  // 旧的硬编码阈值
                     // criticalThreshold: 1000, // 旧的硬编码阈值
-                    chartColor: "#3498DB",
+                    chartColor: Theme.secondaryColor,
                     dataArray: []
                 },
                 {
@@ -153,19 +154,19 @@ Rectangle {
                     status: 0,
                     warningThreshold: 0,
                     criticalThreshold: 0,
-                    chartColor: "#3498DB",
+                    chartColor: Theme.secondaryColor,
                     dataArray: []
                 },
                 {
                     name: "液位",
                     value: 0,
-                    unit: "mm",
+                    unit: "mm", // QML中单位显示，DTO中是米
                     type: "level",
-                    dataKey: "levelValue",
+                    dataKey: "waterLevel", // 对应DTO的waterLevel
                     status: 0,
-                    warningThreshold: 0,
+                    warningThreshold: 0, // 液位通常是范围
                     criticalThreshold: 0,
-                    chartColor: "#2ECC71",
+                    chartColor: Theme.secondaryColor, // 使用Theme次要色 (原为绿色)
                     dataArray: []
                 }
             ]
@@ -246,22 +247,23 @@ Rectangle {
 
     // 检查传感器状态
     function checkSensorStatus(sensor) {
+        // 使用Theme中的颜色进行警告
         if (sensor.criticalThreshold > 0 && sensor.value >= sensor.criticalThreshold) {
-            if (sensor.status !== 2) {
-                sensor.status = 2;
-                if (warningMessage) {
-                    warningMessage.showWarning(sensor.name + "严重超标: " + sensor.value.toFixed(2) + sensor.unit, dangerColor);
+            if (sensor.status !== 2) { // 状态未标记为严重
+                sensor.status = 2; // 更新状态为严重
+                if (warningMessage) { // warningMessage 是 main.qml 中的全局消息组件
+                    warningMessage.showWarning(sensor.name + "严重超标: " + sensor.value.toFixed(2) + sensor.unit, Theme.accentColor); // 使用Theme危险色
                 }
             }
-            return 2;
-        } else if (sensor.warningThreshold > 0 && sensor.value >= sensor.warningThreshold) {
-            if (sensor.status !== 1 && sensor.status !== 2) {
-                sensor.status = 1;
+            return 2; // 返回严重状态
+        } else if (sensor.warningThreshold > 0 && sensor.value >= sensor.warningThreshold) { // 如果超出警告阈值
+            if (sensor.status !== 1 && sensor.status !== 2) { // 状态未标记为警告或严重
+                sensor.status = 1; // 更新状态为警告
                 if (warningMessage) {
-                    warningMessage.showWarning(sensor.name + "超标: " + sensor.value.toFixed(2) + sensor.unit, warningColor);
+                    warningMessage.showWarning(sensor.name + "超标: " + sensor.value.toFixed(2) + sensor.unit, Theme.warningColor); // 使用Theme警告色
                 }
             }
-            return 1;
+            return 1; // 返回警告状态
         } else {
             if (sensor.status !== 0) {
                 sensor.status = 0;
@@ -309,43 +311,41 @@ Rectangle {
         }
     }
 
+    // 主布局
     ColumnLayout {
         anchors.fill: parent
-        anchors.margins: 10
-        spacing: 8
+        anchors.margins: Theme.paddingMedium // 使用Theme中内边距
+        spacing: Theme.paddingSmall // 使用Theme中间距
 
         // 标题栏
         RowLayout {
             Layout.fillWidth: true
 
             Text {
-                text: "传感器数据监测"
-                font.pixelSize: largeFontSize
+                text: qsTr("传感器数据监测") + " (Sensor Data Monitoring)" // 国际化和中文注释: 传感器数据监测
+                font.pixelSize: Theme.largeFontSize // 使用Theme大字号
                 font.bold: true
-                color: textColor
+                color: Theme.textColorOnDark // 使用Theme深色背景文本颜色
             }
 
-            Item { Layout.fillWidth: true }
+            Item { Layout.fillWidth: true } // 占位
 
             Button {
-                text: "显示全部图表"
-
+                text: qsTr("显示全部图表") + " (Show All Charts)" // 国际化和中文注释: 显示全部图表
+                height: Theme.controlHeight // 使用Theme标准控件高度
                 contentItem: Text {
                     text: parent.text
-                    color: textColor
-                    font.pixelSize: fontSize
+                    color: Theme.textColorOnLight // 假设按钮背景深，文本用浅色
+                    font.pixelSize: Theme.defaultFontSize
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
                 }
-
                 background: Rectangle {
-                    color: parent.down ? Qt.darker(accentColor, 1.2) :
-                           parent.hovered ? accentColor : Qt.darker(accentColor, 1.1)
-                    radius: 4
+                    color: parent.down ? Qt.darker(Theme.primaryColor, 1.2) :
+                           parent.hovered ? Theme.primaryColor : Qt.lighter(Theme.primaryColor, 1.1) // 使用Theme主色调
+                    radius: Theme.buttonCornerRadius // 使用Theme按钮圆角
                 }
-
                 onClicked: {
-                    // 打开独立的全部图表窗口，而不是切换视图
                     allChartsDialog.open();
                 }
             }
@@ -356,214 +356,134 @@ Rectangle {
             Layout.fillWidth: true
             Layout.fillHeight: true
             orientation: Qt.Horizontal
-            handle: Rectangle {
-                implicitWidth: 4
-                implicitHeight: 4
-                color: SplitHandle.pressed ? accentColor :
-                       SplitHandle.hovered ? Qt.lighter(accentColor, 1.1) : borderColor
+            handle: Rectangle { // SplitView拖动条样式
+                implicitWidth: Theme.paddingSmall
+                implicitHeight: Theme.paddingSmall
+                color: SplitHandle.pressed ? Theme.primaryColor :
+                       SplitHandle.hovered ? Qt.lighter(Theme.primaryColor, 1.1) : Theme.borderColor
             }
 
             // 左侧传感器列表
             Rectangle {
                 SplitView.preferredWidth: 260
                 SplitView.minimumWidth: 150
-                color: cardColor
-                radius: 5
+                color: Theme.darkThemeCardColor // 使用Theme深色卡片背景
+                radius: Theme.cardCornerRadius // 使用Theme卡片圆角
 
                 ColumnLayout {
                     anchors.fill: parent
-                    anchors.margins: 5
-                    spacing: 8
+                    anchors.margins: Theme.paddingSmall // 使用Theme小内边距
+                    spacing: Theme.paddingMedium
 
                     // 分类标签
                     TabBar {
                         id: sensorTypeBar
                         Layout.fillWidth: true
-
                         background: Rectangle {
-                            color: Qt.rgba(0, 0, 0, 0.2)
-                            radius: 4
+                            color: Qt.rgba(Theme.darkThemeBackgroundColor.r, Theme.darkThemeBackgroundColor.g, Theme.darkThemeBackgroundColor.b, 0.2) // TabBar背景
+                            radius: Theme.buttonCornerRadius
                         }
 
-                        // 全部传感器
+                        // TabButton 样式统一调整
                         TabButton {
-                            text: "全部"
-                            width: implicitWidth
-
+                            text: qsTr("全部") + " (All)" // 国际化: 全部
+                            width: sensorTypeBar.width / 3 // 均分宽度
                             contentItem: Text {
                                 text: parent.text
-                                color: parent.checked ? accentColor : textColor
-                                font.pixelSize: fontSize
+                                color: parent.checked ? Theme.primaryColor : Theme.textColorOnDark
+                                font.pixelSize: Theme.defaultFontSize
                                 horizontalAlignment: Text.AlignHCenter
                                 verticalAlignment: Text.AlignVCenter
                             }
-
                             background: Rectangle {
-                                color: parent.pressed ? Qt.rgba(accentColor.r, accentColor.g, accentColor.b, 0.2) :
-                                       parent.checked ? Qt.rgba(0.1, 0.1, 0.1, 0.6) : "transparent"
-
-                                Rectangle {
+                                color: parent.pressed ? Qt.rgba(Theme.primaryColor.r, Theme.primaryColor.g, Theme.primaryColor.b, 0.2) :
+                                       parent.checked ? Qt.rgba(Theme.darkThemeBackgroundColor.r, Theme.darkThemeBackgroundColor.g, Theme.darkThemeBackgroundColor.b, 0.6) : "transparent"
+                                Rectangle { // 选中指示器
                                     anchors.bottom: parent.bottom
                                     width: parent.width
                                     height: 2
-                                    color: parent.parent.checked ? accentColor : "transparent"
+                                    color: parent.parent.checked ? Theme.primaryColor : "transparent"
                                 }
                             }
                         }
+                        TabButton { text: qsTr("空气") + " (Air)"; width: sensorTypeBar.width / 3; contentItem.font.pixelSize: Theme.defaultFontSize; contentItem.color: parent.checked ? Theme.primaryColor : Theme.textColorOnDark; background.children[0].color: parent.parent.checked ? Theme.primaryColor : "transparent" }
+                        TabButton { text: qsTr("水质") + " (Water)"; width: sensorTypeBar.width / 3; contentItem.font.pixelSize: Theme.defaultFontSize; contentItem.color: parent.checked ? Theme.primaryColor : Theme.textColorOnDark; background.children[0].color: parent.parent.checked ? Theme.primaryColor : "transparent" }
 
-                        // 空气传感器
-                        TabButton {
-                            text: "空气"
-                            width: implicitWidth
-
-                            contentItem: Text {
-                                text: parent.text
-                                color: parent.checked ? accentColor : textColor
-                                font.pixelSize: fontSize
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                            }
-
-                            background: Rectangle {
-                                color: parent.pressed ? Qt.rgba(accentColor.r, accentColor.g, accentColor.b, 0.2) :
-                                       parent.checked ? Qt.rgba(0.1, 0.1, 0.1, 0.6) : "transparent"
-
-                                Rectangle {
-                                    anchors.bottom: parent.bottom
-                                    width: parent.width
-                                    height: 2
-                                    color: parent.parent.checked ? accentColor : "transparent"
-                                }
-                            }
-                        }
-
-                        // 水质传感器
-                        TabButton {
-                            text: "水质"
-                            width: implicitWidth
-
-                            contentItem: Text {
-                                text: parent.text
-                                color: parent.checked ? accentColor : textColor
-                                font.pixelSize: fontSize
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                            }
-
-                            background: Rectangle {
-                                color: parent.pressed ? Qt.rgba(accentColor.r, accentColor.g, accentColor.b, 0.2) :
-                                       parent.checked ? Qt.rgba(0.1, 0.1, 0.1, 0.6) : "transparent"
-
-                                Rectangle {
-                                    anchors.bottom: parent.bottom
-                                    width: parent.width
-                                    height: 2
-                                    color: parent.parent.checked ? accentColor : "transparent"
-                                }
-                            }
-                        }
-
-                        // 当索引变化时更新当前传感器列表
-                        onCurrentIndexChanged: {
-                            updateCurrentSensors();
-                        }
+                        onCurrentIndexChanged: { updateCurrentSensors(); }
                     }
 
-                    // 传感器列表 - 使用高效网格
+                    // 传感器列表
                     ScrollView {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                         clip: true
-
-                        // 使用网格布局提高空间利用率
                         Grid {
                             id: sensorGrid
                             width: parent.width
-                            // 根据宽度自动调整列数（优化空间利用率）
                             columns: calculateOptimalColumns(width)
-                            spacing: 4
+                            spacing: Theme.paddingSmall // 使用Theme小间距
 
-                            // 计算最佳列数
                             function calculateOptimalColumns(availableWidth) {
-                                // 设置最小宽度为120
                                 var minItemWidth = 120;
-                                // 计算可容纳的最大列数
                                 var maxColumns = Math.floor(availableWidth / minItemWidth);
-                                // 返回最少1列，最多3列
                                 return Math.max(1, Math.min(3, maxColumns));
                             }
 
-                            // 直接使用currentSensors作为模型
                             Repeater {
                                 id: sensorRepeater
                                 model: currentSensors
-
-                                // 精简的传感器显示项
-                                Rectangle {
+                                Rectangle { // 精简的传感器显示项
                                     id: sensorItem
                                     width: (sensorGrid.width - (sensorGrid.columns-1) * sensorGrid.spacing) / sensorGrid.columns
-                                    height: 40  // 减小高度使显示更紧凑
-                                    color: selectedSensor === modelData ?
-                                           Qt.rgba(accentColor.r, accentColor.g, accentColor.b, 0.3) :
-                                           (index % 2 === 0 ? Qt.rgba(1,1,1,0.03) : Qt.rgba(1,1,1,0.05))
-                                    radius: 3  // 减小圆角
+                                    height: Theme.controlHeight * 1.2 // 适配Theme控件高度
+                                    color: selectedSensor === modelData ? Qt.rgba(Theme.primaryColor.r, Theme.primaryColor.g, Theme.primaryColor.b, 0.3) :
+                                           (index % 2 === 0 ? Qt.rgba(Theme.textColorOnDark.r, Theme.textColorOnDark.g, Theme.textColorOnDark.b, 0.03) : Qt.rgba(Theme.textColorOnDark.r, Theme.textColorOnDark.g, Theme.textColorOnDark.b, 0.05))
+                                    radius: Theme.buttonCornerRadius / 2 // 使用Theme按钮圆角的一半
 
                                     RowLayout {
                                         anchors.fill: parent
-                                        anchors.leftMargin: 4
-                                        anchors.rightMargin: 4
-                                        spacing: 2  // 减小间距
+                                        anchors.leftMargin: Theme.paddingSmall
+                                        anchors.rightMargin: Theme.paddingSmall
+                                        spacing: Theme.paddingSmall / 2
 
-                                        // 状态指示灯
-                                        Rectangle {
-                                            width: 6
-                                            height: 6
-                                            radius: 3
+                                        Rectangle { // 状态指示灯
+                                            width: 6; height: 6; radius: 3
                                             Layout.alignment: Qt.AlignVCenter
-                                            color: {
-                                                if (modelData.status === 2) return dangerColor;
-                                                if (modelData.status === 1) return warningColor;
-                                                return successColor;
+                                            color: { // 使用Theme颜色
+                                                if (modelData.status === 2) return Theme.accentColor;  // 危险色
+                                                if (modelData.status === 1) return Theme.warningColor; // 警告色
+                                                return Theme.secondaryColor; // 成功色
                                             }
                                         }
-
-                                        // 传感器信息 - 更紧凑的布局
-                                        Column {
+                                        Column { // 传感器信息
                                             Layout.fillWidth: true
                                             Layout.alignment: Qt.AlignVCenter
-                                            spacing: 1  // 减小行间距
-
+                                            spacing: 1
                                             Text {
                                                 text: modelData.name
-                                                color: textColor
+                                                color: Theme.textColorOnDark
                                                 font.bold: true
-                                                font.pixelSize: smallFontSize
+                                                font.pixelSize: Theme.smallFontSize // 使用Theme小字号
                                                 elide: Text.ElideRight
                                                 width: parent.width
                                             }
-
                                             Text {
                                                 text: modelData.value.toFixed(2) + " " + modelData.unit
-                                                color: {
-                                                    if (modelData.status === 2) return dangerColor;
-                                                    if (modelData.status === 1) return warningColor;
-                                                    return textColor;
+                                                color: { // 使用Theme颜色
+                                                    if (modelData.status === 2) return Theme.accentColor;
+                                                    if (modelData.status === 1) return Theme.warningColor;
+                                                    return Theme.textColorOnDark;
                                                 }
-                                                font.pixelSize: smallFontSize
+                                                font.pixelSize: Theme.smallFontSize
                                                 font.family: "Consolas, monospace"
                                             }
                                         }
                                     }
-
-                                    // 点击选择传感器
                                     MouseArea {
                                         anchors.fill: parent
                                         onClicked: {
                                             selectedSensor = modelData;
-                                            // 直接更新图表，避免重复绑定
-                                            if (chartStack.visible) {
-                                                chartStack.updateChart();
-                                            }
+                                            if (chartStack.visible) chartStack.updateChart();
                                         }
                                     }
                                 }
@@ -576,33 +496,24 @@ Rectangle {
             // 右侧图表区域
             Rectangle {
                 SplitView.fillWidth: true
-                color: Qt.rgba(0,0,0,0.2)
-                radius: 5
+                color: Qt.rgba(Theme.darkThemeBackgroundColor.r, Theme.darkThemeBackgroundColor.g, Theme.darkThemeBackgroundColor.b, 0.2) // 使用Theme深色背景的透明变体
+                radius: Theme.cardCornerRadius // 使用Theme卡片圆角
                 clip: true
 
-                // 单传感器图表视图
-                SensorChart {
+                SensorChart { // 单传感器图表视图
                     id: chartStack
                     anchors.fill: parent
-                    anchors.margins: 10
+                    anchors.margins: Theme.paddingMedium
                     visible: true
-
-                    // 绑定属性
                     title: selectedSensor ? selectedSensor.name : ""
                     unit: selectedSensor ? selectedSensor.unit : ""
-                    chartColor: selectedSensor ? selectedSensor.chartColor : accentColor
+                    chartColor: selectedSensor ? selectedSensor.chartColor : Theme.primaryColor // 使用Theme主色调
                     warningThreshold: selectedSensor ? selectedSensor.warningThreshold : 0
                     criticalThreshold: selectedSensor ? selectedSensor.criticalThreshold : 0
                     value: selectedSensor ? selectedSensor.value : 0
-
-                    // 更新图表数据
                     function updateChart() {
                         if (!selectedSensor) return;
-
-                        // 清空原有数据
                         lineSeries.clear();
-
-                        // 添加新数据
                         var dataArray = selectedSensor.dataArray || [];
                         for (var i = 0; i < dataArray.length; i++) {
                             lineSeries.append(dataArray[i].x, dataArray[i].y);
@@ -613,74 +524,59 @@ Rectangle {
         }
     }
 
-    // 全部图表对话框 - 改为独立窗口
+    // 全部图表对话框
     Dialog {
         id: allChartsDialog
-        title: "全部传感器图表"
+        title: qsTr("全部传感器图表") + " (All Sensor Charts)" // 国际化: 全部传感器图表
         width: Math.min(parent.width * 0.9, 1200)
         height: Math.min(parent.height * 0.9, 800)
         modal: true
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
 
-        // 自定义标题栏和内容
-        background: Rectangle {
-            color: darkColor
-            radius: 8
-
+        background: Rectangle { // 自定义背景
+            color: Theme.darkThemeBackgroundColor
+            radius: Theme.cardCornerRadius // 使用Theme卡片圆角
             layer.enabled: true
             layer.effect: DropShadow {
-                horizontalOffset: 0
-                verticalOffset: 2
-                radius: 8.0
-                samples: 17
-                color: Qt.rgba(0, 0, 0, 0.5)
+                horizontalOffset: 0; verticalOffset: 2; radius: 8.0; samples: 17
+                color: Theme.shadowColor // 使用Theme阴影色
             }
         }
 
-        header: Rectangle {
-            color: primaryColor
-            height: 40
-            radius: 8
-
-            // 只有顶部圆角
-            Rectangle {
-                color: primaryColor
-                anchors.bottom: parent.bottom
-                anchors.left: parent.left
-                anchors.right: parent.right
+        header: Rectangle { // 自定义标题栏
+            color: Theme.darkThemeCardColor // 使用Theme深色卡片背景
+            height: Theme.controlHeight * 1.2 // 适配Theme控件高度
+            radius: Theme.cardCornerRadius
+            Rectangle { // 仅顶部圆角
+                color: Theme.darkThemeCardColor
+                anchors.bottom: parent.bottom; anchors.left: parent.left; anchors.right: parent.right
                 height: parent.height / 2
             }
-
             RowLayout {
                 anchors.fill: parent
-                anchors.leftMargin: 15
-                anchors.rightMargin: 15
-
+                anchors.leftMargin: Theme.paddingLarge
+                anchors.rightMargin: Theme.paddingLarge
                 Text {
                     text: allChartsDialog.title
-                    color: textColor
-                    font.pixelSize: largeFontSize
+                    color: Theme.textColorOnDark
+                    font.pixelSize: Theme.largeFontSize
                     font.bold: true
                 }
-
                 Item { Layout.fillWidth: true }
-
-                Button {
+                Button { // 关闭按钮
                     text: "×"
                     flat: true
                     onClicked: allChartsDialog.close()
-
                     contentItem: Text {
                         text: parent.text
-                        color: textColor
-                        font.pixelSize: largeFontSize
+                        color: Theme.textColorOnDark
+                        font.pixelSize: Theme.largeFontSize
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                     }
-
                     background: Rectangle {
-                        color: parent.hovered ? Qt.rgba(1,1,1,0.1) : "transparent"
-                        radius: 4
+                        color: parent.hovered ? Qt.rgba(Theme.textColorOnDark.r, Theme.textColorOnDark.g, Theme.textColorOnDark.b, 0.1) : "transparent"
+                        radius: Theme.buttonCornerRadius
                     }
                 }
             }
@@ -691,31 +587,23 @@ Rectangle {
             id: allChartsView
             anchors.fill: parent
             clip: true
-
             GridLayout {
                 width: allChartsView.width
-                columns: width > 700 ? 2 : 1
-                rowSpacing: 10
-                columnSpacing: 10
-
-                // 动态生成所有传感器的图表
-                Repeater {
+                columns: width > 700 ? 2 : 1 // 响应式列数
+                rowSpacing: Theme.paddingMedium
+                columnSpacing: Theme.paddingMedium
+                Repeater { // 动态生成图表
                     model: getAllSensors()
-
                     SensorChart {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 250
-
-                        // 绑定传感器属性
                         title: modelData.name
                         unit: modelData.unit
-                        chartColor: modelData.chartColor
+                        chartColor: modelData.chartColor // chartColor 已在 sensorGroups 中定义，可考虑也用Theme
                         warningThreshold: modelData.warningThreshold
                         criticalThreshold: modelData.criticalThreshold
                         value: modelData.value
-
-                        // 组件完成加载后填充数据
-                        Component.onCompleted: {
+                        Component.onCompleted: { // 填充数据
                             var dataArray = modelData.dataArray || [];
                             for (var i = 0; i < dataArray.length; i++) {
                                 lineSeries.append(dataArray[i].x, dataArray[i].y);
@@ -727,7 +615,7 @@ Rectangle {
         }
     }
 
-    // 数据更新处理 - 优化性能，避免闪烁
+    // 数据更新处理
     Connections {
         target: sensorModule
         function onDisplayDataChanged() {

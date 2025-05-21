@@ -5,6 +5,7 @@ import QtLocation 5.15
 import QtPositioning 5.15
 import QtQuick.Layouts 1.15
 import QtGraphicalEffects 1.15
+import "." // 导入Theme单例
 
 Item {
     id: mapViewPanel
@@ -23,8 +24,8 @@ Item {
             timestamp: timestamp
         };
 
-        if (warningMessage) {
-            warningMessage.showWarning("Home点已设置", successColor);
+        if (warningMessage) { // warningMessage 是 main.qml 中的全局消息组件
+            warningMessage.showWarning(qsTr("Home点已设置"), Theme.secondaryColor); // 使用Theme成功色
         }
     }
 
@@ -144,16 +145,16 @@ Item {
                     anchors.centerIn: parent
                     width: 30
                     height: 30
-                    color: successColor
+                    color: Theme.secondaryColor // Home点使用Theme次要色 (绿色)
                     radius: 15
-                    border.width: 3
-                    border.color: "white"
+                    border.width: 2 // 边框略细一些
+                    border.color: Theme.textColorOnDark // 边框颜色使用深色背景上的文本色
 
                     Text {
                         anchors.centerIn: parent
                         text: "H"
-                        color: "white"
-                        font.pixelSize: 16
+                        color: Theme.textColorOnDark // 文字颜色使用深色背景上的文本色
+                        font.pixelSize: Theme.largeFontSize // 使用Theme大字号
                         font.bold: true
                     }
                 }
@@ -166,7 +167,7 @@ Item {
                     color: "transparent"
                     radius: 15
                     border.width: 3
-                    border.color: successColor
+                    border.color: Theme.secondaryColor // 脉冲颜色与Home点一致
                     opacity: pulseAnim.running ? pulseAnim.opacity : 0
                     scale: pulseAnim.running ? pulseAnim.scale : 1
 
@@ -233,10 +234,10 @@ Item {
                     anchors.centerIn: parent
                     width: 30
                     height: 30
-                    color: dangerColor
+                    color: Theme.accentColor // 船只图标使用Theme强调色 (红色)
                     radius: 15
-                    border.width: 3
-                    border.color: "white"
+                    border.width: 2
+                    border.color: Theme.textColorOnDark // 边框颜色
 
                     // 动态旋转，显示航向
                     transform: Rotation {
@@ -245,13 +246,21 @@ Item {
                         angle: vesselModule.heading
                     }
 
-                    // 船头指示器
-                    Rectangle {
-                        width: 3
-                        height: 10
-                        color: "white"
+                    // 船头指示器 (箭头形状)
+                    Path {
                         anchors.centerIn: parent
-                        anchors.verticalCenterOffset: -10
+                        strokeColor: Theme.textColorOnDark // 箭头颜色
+                        strokeWidth: 2
+                        fillColor: "transparent" // 不填充，仅边框
+                        pathElements: [
+                            PathMove { x: 15; y: 5 }, // 调整点以适应30x30的矩形
+                            PathLine { x: 15; y: 0 },
+                            PathLine { x: 20; y: 7.5 },
+                            PathMove { x: 15; y: 0 },
+                            PathLine { x: 10; y: 7.5 }
+                        ]
+                        //向上平移箭头，使其在图标上半部分
+                        y: -5
                     }
                 }
 
@@ -263,7 +272,7 @@ Item {
                     color: "transparent"
                     radius: 15
                     border.width: 3
-                    border.color: dangerColor
+                    border.color: Theme.accentColor // 脉冲颜色与船只图标一致
                     opacity: boatPulseAnim.running ? boatPulseAnim.opacity : 0
                     scale: boatPulseAnim.running ? boatPulseAnim.scale : 1
 
@@ -315,21 +324,20 @@ Item {
         }
 
         // 船只轨迹线 - 使用MapPolyline
-        MapPolyline {
+        MapPolyline { // 船只轨迹线
             id: trajectoryLine
             line.width: 3
-            line.color: dangerColor
+            line.color: Theme.accentColor // 轨迹线使用Theme强调色
             opacity: 0.7
-            // 初始化为空数组，而不是null或undefined
             path: []
             z: 1
         }
 
         // 任务点连线 - 使用MapPolyline
-        MapPolyline {
+        MapPolyline { // 任务路径线
             id: taskPathLine
             line.width: 3
-            line.color: accentColor
+            line.color: Theme.primaryColor // 任务路径线使用Theme主色调
             opacity: 0.7
             // 初始化为空数组，而不是null或undefined
             path: []
@@ -352,22 +360,22 @@ Item {
             bottom: parent.bottom
             margins: 20
         }
-        width: 50
-        height: 230
-        color: cardColor
-        radius: 25
+        width: Theme.controlHeight * 1.5 // 基于Theme调整大小
+        height: Theme.controlHeight * 5 // 基于Theme调整大小
+        color: Theme.darkThemeCardColor // 使用Theme深色卡片背景
+        radius: Theme.buttonCornerRadius // 使用Theme按钮圆角
         opacity: 0.9
 
         layer.enabled: true
-        layer.effect: DropShadow {
+        layer.effect: DropShadow { // 阴影效果
             horizontalOffset: 0
             verticalOffset: 2
             radius: 8.0
             samples: 17
-            color: Qt.rgba(0, 0, 0, 0.5)
+            color: Theme.shadowColor // 使用Theme阴影色
         }
 
-        function contains(point) {
+        function contains(point) { // 检查点是否在面板内
             return point.x >= 0 && point.y >= 0 &&
                    point.x <= width && point.y <= height;
         }
@@ -417,27 +425,32 @@ Item {
     }
 
     // 地图控制按钮
+    // 地图控制按钮组件
     component MapControlButton: Rectangle {
-        property string text: ""
-        property bool isActive: false
-        signal clicked()
+        property string text: "" // 按钮文本 (图标)
+        property bool isActive: false // 按钮是否处于激活状态 (例如跟随模式)
+        signal clicked() // 点击信号
 
-        width: 32
-        height: 32
-        radius: 16
-        color: mouseArea.pressed ? Qt.darker(accentColor, 1.3) :
-               mouseArea.containsMouse ? accentColor :
-               isActive ? Qt.lighter(accentColor, 1.2) : Qt.rgba(1,1,1,0.2)
+        width: Theme.controlHeight * 1.2 // 按钮宽度
+        height: Theme.controlHeight * 1.2 // 按钮高度
+        radius: width / 2 // 圆形按钮
+        // color: mouseArea.pressed ? Qt.darker(accentColor, 1.3) : // 旧颜色逻辑
+        //        mouseArea.containsMouse ? accentColor :
+        //        isActive ? Qt.lighter(accentColor, 1.2) : Qt.rgba(1,1,1,0.2)
+        color: mouseArea.pressed ? Qt.darker(Theme.primaryColor, 1.3) : // 按下时颜色变深
+               mouseArea.containsMouse ? Theme.primaryColor : // 悬停时使用主色调
+               isActive ? Qt.lighter(Theme.primaryColor, 1.2) : // 激活时颜色变浅
+               Qt.rgba(Theme.textColorOnDark.r, Theme.textColorOnDark.g, Theme.textColorOnDark.b, 0.2) // 默认半透明背景
 
         Text {
             anchors.centerIn: parent
             text: parent.text
-            color: textColor
-            font.pixelSize: fontSize
+            color: Theme.textColorOnDark // 文本颜色
+            font.pixelSize: Theme.defaultFontSize * 1.2 // 稍大一点的字体
             font.bold: true
         }
 
-        MouseArea {
+        MouseArea { // 鼠标交互区域
             id: mouseArea
             anchors.fill: parent
             hoverEnabled: true
@@ -454,32 +467,32 @@ Item {
         id: taskPointDelegate
 
         MapQuickItem {
-            coordinate: QtPositioning.coordinate(model.latitude, model.longitude)
-            anchorPoint.x: 20
-            anchorPoint.y: 20
+            coordinate: QtPositioning.coordinate(model.latitude, model.longitude) // 任务点坐标
+            anchorPoint.x: 15 // 锚点调整，使数字居中
+            anchorPoint.y: 15
 
             sourceItem: Item {
-                width: 40
-                height: 40
+                width: 30 // 标记大小
+                height: 30
 
-                Rectangle {
+                Rectangle { // 任务点背景圆
                     anchors.centerIn: parent
-                    width: 30
-                    height: 30
-                    color: accentColor
-                    radius: 15
-                    border.width: 3
-                    border.color: "white"
+                    width: parent.width
+                    height: parent.height
+                    color: Theme.primaryColor // 使用Theme主色调
+                    radius: width / 2 // 圆形
+                    border.width: 2
+                    border.color: Theme.textColorOnDark // 边框颜色
 
-                    Text {
+                    Text { // 任务点序号
                         anchors.centerIn: parent
-                        text: index + 1
-                        color: "white"
-                        font.pixelSize: 16
+                        text: index + 1 // 显示序号 (从1开始)
+                        color: Theme.textColorOnDark // 文本颜色
+                        font.pixelSize: Theme.defaultFontSize // 使用Theme默认字号
                         font.bold: true
                     }
                 }
             }
         }
-    }
+    } // End of taskPointDelegate
 }
