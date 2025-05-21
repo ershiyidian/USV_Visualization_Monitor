@@ -4,6 +4,7 @@ import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
 import QtQuick.Window 2.15
 import QtGraphicalEffects 1.15
+import "." // 导入包含Theme.qml的目录，使其可作为Theme单例访问
 
 ApplicationWindow {
     id: appWindow
@@ -12,25 +13,11 @@ ApplicationWindow {
     height: 800
     title: "水面环境监测与导航系统"
 
-    // 全局样式常量
-    readonly property color primaryColor: "#2C3E50"      // 主色调
-    readonly property color accentColor: "#3498DB"       // 强调色
-    readonly property color dangerColor: "#E74C3C"       // 警告色
-    readonly property color warningColor: "#F39C12"      // 注意色
-    readonly property color successColor: "#2ECC71"      // 成功色
-    readonly property color cardColor: "#34495E"         // 卡片背景色
-    readonly property color darkColor: "#1E2A38"         // 深色背景
-    readonly property color textColor: "#ECF0F1"         // 文本色
-    readonly property color borderColor: "#7F8C8D"       // 边框色
-    readonly property color chartGridColor: "#3E4D5C"    // 图表网格线色
-
-    readonly property int fontSize: 13                   // 基础字号
-    readonly property int smallFontSize: 11              // 小字号
-    readonly property int largeFontSize: 15              // 大字号
+    // 旧的全局样式常量已移除，将使用Theme.qml中的属性
 
     // 设置全局样式
     background: Rectangle {
-        color: darkColor
+        color: Theme.darkThemeBackgroundColor // 使用Theme中的深色背景
     }
 
     // 顶部消息栏
@@ -40,6 +27,7 @@ ApplicationWindow {
         anchors.right: parent.right
         anchors.top: parent.top
         height: 40
+        // TopMessageBar 内部也需要更新以使用 Theme 属性 (此部分将在其各自的文件中处理)
     }
 
     // 主内容区域
@@ -119,8 +107,8 @@ ApplicationWindow {
         id: warningMessage
         width: warningText.width + 40
         height: 40
-        radius: 6
-        color: dangerColor
+        radius: Theme.cardCornerRadius // 使用Theme中的圆角属性
+        color: Theme.accentColor // 使用Theme中的危险/强调色
         opacity: 0
         visible: opacity > 0
         anchors {
@@ -130,11 +118,11 @@ ApplicationWindow {
         }
 
         property string message: ""
-        property color messageColor: dangerColor
+        property color messageColor: Theme.accentColor // 默认使用Theme中的危险/强调色
 
         function showWarning(text, color) {
             message = text;
-            messageColor = color || dangerColor;
+            messageColor = color || Theme.accentColor; // 如果未提供颜色，则使用Theme的危险色
             warningAnimation.start();
         }
 
@@ -142,8 +130,8 @@ ApplicationWindow {
             id: warningText
             anchors.centerIn: parent
             text: warningMessage.message
-            color: textColor
-            font.pixelSize: fontSize
+            color: Theme.textColorOnDark // 使用Theme中的深色背景文本颜色
+            font.pixelSize: Theme.defaultFontSize // 使用Theme中的默认字号
             font.bold: true
         }
 
