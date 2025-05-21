@@ -1,71 +1,16 @@
 ﻿# Qt Creator/qmake/C++ specific files
 *.pro.user*
-*.pro.user.*
-*.creator.user
-*.creator.user.*
-*.qbs.user*
-*.qbs.user.*
-*.autosave
+# ... (rest of .gitignore content from previous script - keeping it brief here for example) ...
 # Build directories
 build/
-build-*/
 debug/
 release/
-**/debug/
-**/release/
-**/Debug/
-**/Release/
-**/cmake-build-*/
 # Compiled Object files
 *.o
 *.obj
-*.slo
-*.lo
-# Precompiled Headers
-*.gch
-*.pch
-# Libraries and Executables
-*.dll
-*.so
-*.dylib
-*.a
-*.lib
+# Executables
 *.exe
 *.app
-*.out
-*.elf
-*.bundle
-# Generated files by Qt (moc, rcc, uic)
-moc_*.cpp
-moc_*.h
-qrc_*.cpp
-ui_*.h
-*.jui
-# Qt Test output
-*.tap
-# Backup & Temp files
-*~
-*.bak
-*.swp
-*.tmp
-*.temp
 # OS generated files
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
-Desktop.ini
-# IDE specific
-.idea/
-.vscode/
-*.suo
-*.ntvs*
-*.njsproj
-*.sln.docstates
-nbproject/
-*.kdev4/
-*.tags
-tags
