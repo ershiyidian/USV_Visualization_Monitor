@@ -24,8 +24,8 @@ Rectangle {
                     type: "air",
                     dataKey: "co2",
                     status: 0,
-                    warningThreshold: 1000,
-                    criticalThreshold: 2000,
+                    // warningThreshold: 1000, // 旧的硬编码阈值，将被动态加载
+                    // criticalThreshold: 2000, // 旧的硬编码阈值，将被动态加载
                     chartColor: accentColor,
                     dataArray: []
                 },
@@ -36,8 +36,8 @@ Rectangle {
                     type: "air",
                     dataKey: "ch2o",
                     status: 0,
-                    warningThreshold: 0.08,
-                    criticalThreshold: 0.1,
+                    // warningThreshold: 0.08, // 旧的硬编码阈值
+                    // criticalThreshold: 0.1,   // 旧的硬编码阈值
                     chartColor: accentColor,
                     dataArray: []
                 },
@@ -48,8 +48,10 @@ Rectangle {
                     type: "air",
                     dataKey: "tvoc",
                     status: 0,
-                    warningThreshold: 500,
-                    criticalThreshold: 800,
+                    // warningThreshold: 500, // 旧的硬编码阈值 (ppb)
+                    // criticalThreshold: 800, // 旧的硬编码阈值 (ppb)
+                    // 注意: DTO的tvoc单位是mg/m³, SensorModule暴露的limit是ppb. QML中需要转换或SensorModule提供转换后的limit.
+                    // 为了演示，这里假设QML将处理单位或SensorModule提供了匹配单位的limit.
                     chartColor: accentColor,
                     dataArray: []
                 },
@@ -60,8 +62,8 @@ Rectangle {
                     type: "air",
                     dataKey: "pm25",
                     status: 0,
-                    warningThreshold: 75,
-                    criticalThreshold: 150,
+                    // warningThreshold: 75,  // 旧的硬编码阈值
+                    // criticalThreshold: 150, // 旧的硬编码阈值
                     chartColor: accentColor,
                     dataArray: []
                 },
@@ -72,8 +74,8 @@ Rectangle {
                     type: "air",
                     dataKey: "pm10",
                     status: 0,
-                    warningThreshold: 150,
-                    criticalThreshold: 250,
+                    // warningThreshold: 150, // 旧的硬编码阈值
+                    // criticalThreshold: 250, // 旧的硬编码阈值
                     chartColor: accentColor,
                     dataArray: []
                 },
@@ -111,10 +113,10 @@ Rectangle {
                     value: 0,
                     unit: "NTU",
                     type: "water",
-                    dataKey: "turbidity",
+                    dataKey: "turbidity", // DTO: waterTurbidity
                     status: 0,
-                    warningThreshold: 5,
-                    criticalThreshold: 20,
+                    // warningThreshold: 5,   // 旧的硬编码阈值
+                    // criticalThreshold: 20,  // 旧的硬编码阈值
                     chartColor: "#3498DB",
                     dataArray: []
                 },
@@ -125,8 +127,8 @@ Rectangle {
                     type: "water",
                     dataKey: "ph",
                     status: 0,
-                    warningThreshold: 8.5,
-                    criticalThreshold: 9.0,
+                    // warningThreshold: 8.5, // 旧的硬编码阈值
+                    // criticalThreshold: 9.0, // 旧的硬编码阈值
                     chartColor: "#3498DB",
                     dataArray: []
                 },
@@ -137,8 +139,8 @@ Rectangle {
                     type: "water",
                     dataKey: "tds",
                     status: 0,
-                    warningThreshold: 500,
-                    criticalThreshold: 1000,
+                    // warningThreshold: 500,  // 旧的硬编码阈值
+                    // criticalThreshold: 1000, // 旧的硬编码阈值
                     chartColor: "#3498DB",
                     dataArray: []
                 },
@@ -173,16 +175,48 @@ Rectangle {
     // 筛选不同类型的传感器数据
     property var currentSensors: []
 
-    // 初始化函数，确保数据正确加载
+    // 初始化函数，确保数据正确加载并设置阈值
     function initializeSensors() {
         startTime = new Date().getTime();
+        var allSensors = getAllSensors();
+
+        // 从sensorModule加载阈值
+        for (var i = 0; i < allSensors.length; i++) {
+            var sensor = allSensors[i];
+            var warningLimitProp = sensor.dataKey + "WarningLimit";
+            var criticalLimitProp = sensor.dataKey + "CriticalLimit";
+
+            if (sensorModule.hasOwnProperty(warningLimitProp)) {
+                sensor.warningThreshold = sensorModule[warningLimitProp];
+            } else {
+                // console.warn("Warning limit for " + sensor.dataKey + " not found in sensorModule.");
+                sensor.warningThreshold = 0; // 默认值或处理
+            }
+
+            if (sensorModule.hasOwnProperty(criticalLimitProp)) {
+                sensor.criticalThreshold = sensorModule[criticalLimitProp];
+            } else {
+                // console.warn("Critical limit for " + sensor.dataKey + " not found in sensorModule.");
+                sensor.criticalThreshold = 0; // 默认值或处理
+            }
+
+            // 特殊处理TVOC单位：SensorModule limit (ppb) vs DTO/display (mg/m³)
+            // QML中value的单位是mg/m³ (来自DTO)，而FrameConstant中limit的单位是ppb
+            // 因此，比较时需要统一单位。这里假设checkSensorStatus会基于mg/m³进行比较。
+            // 所以，将ppb的limit转换为mg/m³。1 ppb TVOC (toluene) approx 0.00375 mg/m³
+            if (sensor.dataKey === "tvoc") {
+                // sensorModule.tvocWarningLimit 和 sensorModule.tvocCriticalLimit 是ppb
+                sensor.warningThreshold = sensorModule.tvocWarningLimit * 0.00375; // ppb to mg/m³
+                sensor.criticalThreshold = sensorModule.tvocCriticalLimit * 0.00375; // ppb to mg/m³
+                // console.log("TVOC Limits (mg/m³): Warn=" + sensor.warningThreshold + ", Crit=" + sensor.criticalThreshold);
+            }
+        }
+
         updateCurrentSensors();
 
         // 确保在初始状态下有选中的传感器
-        var allSensors = getAllSensors();
         if (allSensors.length > 0 && !selectedSensor) {
             selectedSensor = allSensors[0];
-            // 更新图表
             if (chartStack.visible) {
                 chartStack.updateChart();
             }
@@ -709,7 +743,7 @@ Rectangle {
                 // 更新数值
                 sensor.value = value;
 
-                // 检查状态
+            // 检查状态 (checkSensorStatus 现在会使用 sensor.warningThreshold 和 sensor.criticalThreshold)
                 checkSensorStatus(sensor);
 
                 // 添加新数据点

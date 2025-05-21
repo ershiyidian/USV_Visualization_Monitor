@@ -131,7 +131,7 @@ public:
     explicit DataSource(QObject *parent = nullptr); // 构造函数
     ~DataSource(); // 析构函数
 
-    // 属性访问器
+    // 属性访问器 (Getters for properties)
     bool pumpState() const { return m_pumpState; } // 获取水泵状态
     bool pump_mode() const {return m_pump_mode; } // 获取水泵模式
     bool boat_mode() const {return m_boat_mode; } // 获取船只模式
@@ -155,14 +155,14 @@ public slots:
     void setIsSimulating(bool enabled); // 设置是否启用数据模拟
     void setMergedFrameHeader(const QString& header); // 设置合并帧头 (十六进制字符串)
     void setMergedFrameTrailer(const QString& trailer); // 设置合并帧尾 (十六进制字符串)
-    void sendData(const std::vector<QString>& taskPointsData); // @deprecated 旧的发送任务点数据接口，将由handleMissionCommand取代
+    // void sendData(const std::vector<QString>& taskPointsData); // @deprecated 已移除，使用handleMissionCommand
     void setPumpState(bool state); // 设置水泵开启/关闭状态
     void setMotor1(quint16 value); // 设置电机1的输出值
     void setMotor2(quint16 value); // 设置电机2的输出值
     void updatePumpModeInDataSource(bool mode); // @deprecated 更新水泵的工作模式 (手动/自动) -已被新的控制流程取代
     void updateBoatModeInDataSource(bool mode); // @deprecated 更新船只的工作模式 (手动/自动) -已被新的控制流程取代
     void handleDeviceControl(const DeviceControlDto& controlCmd); // 处理来自DeviceModule的设备控制指令
-    void handleMissionCommand(const MissionCommandDto& missionCmd); // 新增: 处理来自DeviceModule的任务指令
+    void handleMissionCommand(const MissionCommandDto& missionCmd); // 处理来自DeviceModule的任务指令
 
 signals:
     // 新的DTO信号 - 用于通知数据更新
@@ -216,8 +216,9 @@ private:
     void handleSerialError(QSerialPort::SerialPortError error); // 处理串口发生的错误
     void checkAvailablePorts(); // 定期检查系统中的可用串口列表
     void generateFakeData(); // 生成模拟的传感器、船体和设备数据 (DTOs) 并发送信号
-    // QByteArray generateMergedFrame(); // 此函数已从 .cpp 中移除，其声明在此处注释掉或删除
+    // QByteArray generateMergedFrame(); // 旧的模拟帧生成函数, 已移除
     int calculateFrameSize(const QByteArray& data); // 根据帧定义计算期望的帧大小
+    QByteArray buildOutgoingPacket(const MissionCommandDto* missionCmd = nullptr); // 新增: 构建待发送数据包的私有方法
 
     // 数据转换辅助方法
     double convertAirTemperature(uint8_t high, uint8_t low); // 将高低字节组合为空气温度值

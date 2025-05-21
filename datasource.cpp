@@ -365,168 +365,11 @@ void DataSource::updateBoatModeInDataSource(bool mode){
     }
 }
 
-// @deprecated 旧的发送任务点数据接口，将由handleMissionCommand取代
-// 此函数将被新的 handleMissionCommand(const MissionCommandDto& missionCmd) 取代。
-// 为平稳过渡，暂时保留，但其逻辑将被迁移。
-void DataSource::sendData(const std::vector<QString>& taskPointsData)
-{
-    qDebug() << "DataSource::sendData (deprecated) called. This function will be removed. Use missionCommandRequested signal from DeviceModule instead.";
-    if (!serialPort->isOpen()) { // 检查串口是否打开
-        qDebug() << "串口未打开，无法发送数据";
-        emit error("串口未打开，无法发送数据");
-        return;
-    }
-
-    try {
-        if (taskPointsData.empty()) { // 检查任务点数据是否为空
-            emit error("任务点数据为空，无法发送");
-            return;
-        }
-
-        // 创建数据包字节数组
-        QByteArray data;
-        // 预设最小大小 (帧头+时间戳+Home点+控制块基本大小)
-        int minSize = FRAME_HEADER_SIZE + TIMESTAMP_LENGTH + HOME_POINT_SIZE + CONTROL_BLOCK_SIZE; // CONTROL_BLOCK_SIZE为7
-        data.resize(minSize); // 初始化大小
-        data[0] = FRAME_HEADER; // 设置帧头
-        data[1] = FRAME_TRAILER; // 设置帧同步/部分帧尾 (注意：实际完整帧尾通常在数据包末尾)
-
-        // 处理时间戳 (从第一个任务点数据中提取)
-        QString firstData = taskPointsData[0]; // 第一个点通常包含时间戳信息
-        QStringList list = firstData.split(",");
-        if (list.size() < 3) { // 假设格式为 "经度,纬度,时间戳"
-            emit error("Home点数据格式不正确 (缺少时间戳)");
-            return;
-        }
-
-        // 解析时间戳字符串 ("YYYY-MM-DD HH:MM:SS")
-        std::string timestampStr = list[2].toStdString();
-        std::tm tm = {};
-        std::istringstream ss(timestampStr);
-        ss >> std::get_time(&tm, "%Y-%m-%d %H:%M:%S");
-        if (ss.fail()) {
-            emit error("时间戳解析失败");
-            return;
-        }
-        std::time_t time = std::mktime(&tm); // 转换为time_t
-        qint64 sec = static_cast<qint64>(time); // 转换为qint64 (秒数)
-
-        // 将时间戳写入数据包 (8字节, 小端序, 偏移量2)
-        QDataStream timeStream(&data, QIODevice::WriteOnly);
-        timeStream.setByteOrder(QDataStream::LittleEndian); // 设置小端字节序
-        timeStream.device()->seek(FRAME_HEADER_SIZE); // 定位到时间戳写入位置
-        timeStream << sec; // 写入时间戳
-
-        // 处理Home点和任务点数据
-        int taskIndex = 0; // 任务点计数器 (0为Home点)
-        for (const auto& dataStr : taskPointsData) {
-            // 根据任务点数量调整数据包大小
-            int taskCount = taskPointsData.size();
-            // 限制最大任务点数量 (MAX_TASK_POINTS个任务点 + 1个Home点)
-            int validTaskCount = taskCount > (MAX_TASK_POINTS + 1) ? (MAX_TASK_POINTS + 1) : taskCount;
-            // 总大小 = 最小大小 + (有效任务点数-1) * 每个任务点大小
-            int totalSize = minSize + (validTaskCount - 1) * TASK_POINT_SIZE; // 减1因为minSize已包含一个点(Home点)
-            data.resize(totalSize); // 调整数据包大小
-
-            if (taskIndex > MAX_TASK_POINTS) { // 如果当前点是任务点且超出最大数量
-                qDebug() << "任务点数量超出限制，只处理前" << MAX_TASK_POINTS + 1 << "个点 (含Home点)";
-                break; // 跳出循环，不再处理更多点
-            }
-
-            QStringList parts = dataStr.split(","); // 按逗号分割经纬度数据
-            if (parts.size() < 2) { // 至少需要经度和纬度
-                qWarning() << "任务点数据格式不正确: " << dataStr;
-                continue; // 跳过此无效数据点
-            }
-
-            // 解析经纬度字符串为double
-            bool okLon = false, okLat = false;
-            double longitude = parts[0].toDouble(&okLon);
-            double latitude = parts[1].toDouble(&okLat);
-
-            if (!okLon || !okLat || !isValidGpsCoordinate(latitude, longitude)) { // 校验GPS坐标有效性
-                qWarning() << "无效的经纬度坐标: " << longitude << "," << latitude;
-                continue; // 跳过此无效数据点
-            }
-
-            // 计算当前点在数据包中的偏移量
-            int pointOffset;
-            if (taskIndex == 0) { // Home点
-                pointOffset = FRAME_HEADER_SIZE + TIMESTAMP_LENGTH;
-            } else { // 普通任务点 (taskIndex从1开始计数任务点)
-                pointOffset = FRAME_HEADER_SIZE + TIMESTAMP_LENGTH + HOME_POINT_SIZE + (taskIndex - 1) * TASK_POINT_SIZE;
-            }
-
-            // 写入经度 (1字节整数部分 + 4字节小数部分)
-            int lonInt = static_cast<int>(longitude); // 取整数部分
-            data[pointOffset] = static_cast<char>(lonInt); // 写入整数部分
-            float lonDecimal = static_cast<float>(longitude - lonInt); // 计算小数部分 (float类型)
-            memcpy(data.data() + pointOffset + 1, &lonDecimal, 4); // 写入小数部分 (4字节)
-
-            // 写入纬度 (1字节整数部分 + 4字节小数部分)
-            int latInt = static_cast<int>(latitude); // 取整数部分
-            data[pointOffset + COORD_TOTAL_SIZE] = static_cast<char>(latInt); // 写入整数部分 (偏移5字节)
-            float latDecimal = static_cast<float>(latitude - latInt); // 计算小数部分 (float类型)
-            memcpy(data.data() + pointOffset + COORD_TOTAL_SIZE + 1, &latDecimal, 4); // 写入小数部分 (偏移6字节, 共4字节)
-            
-            taskIndex++; // 任务点计数器递增
-        }
-
-        // --- 处理控制指令块 ---
-        // 控制指令块的起始偏移量
-        int controlBlockOffset = FRAME_HEADER_SIZE + TIMESTAMP_LENGTH + HOME_POINT_SIZE + (taskIndex > 0 ? (taskIndex -1) : 0) * TASK_POINT_SIZE;
-        if (taskIndex == 0 && !taskPointsData.empty()) { // 如果只有Home点，taskIndex会是1，但实际写入点数是1
-             controlBlockOffset = FRAME_HEADER_SIZE + TIMESTAMP_LENGTH + HOME_POINT_SIZE; // Home点之后就是控制块
-        } else if (taskIndex == 0 && taskPointsData.empty()){ // 不应该发生，但做保护
-            emit error("无任务点数据，无法定位控制块");
-            return;
-        }
-
-
-        // 水泵模式 (1字节): 0=手动, 1=自动
-        data[controlBlockOffset] = m_pump_mode ? 1 : 0;
-        qDebug() << "发送的水泵模式：" << (m_pump_mode ? "自动" : "手动");
-
-        // 水泵控制 (1字节): 手动模式下有效, 0=关闭, 1=开启
-        data[controlBlockOffset + 1] = m_pumpState ? 1 : 0;
-
-        // 船只模式 (1字节): 0=手动, 1=自动, 2=位置保持
-        // 注意：m_boat_mode是bool (false=手动, true=自动). 需要映射到0,1,2.
-        // 假设这里 m_boat_mode=true (自动) 对应协议的 1 (自动). 位置保持模式需要额外逻辑.
-        // 为简化，当前 m_boat_mode=true 映射为1 (自动)，false 映射为0 (手动).
-        uint8_t boatModeProtocol = m_boat_mode ? 1 : 0; // 默认为自动或手动
-        // if (m_isPositionHoldActive) boatModeProtocol = 2; // 位置保持模式的逻辑 (本期未实现)
-        data[controlBlockOffset + 2] = boatModeProtocol;
-        qDebug() << "发送的船只模式：" << boatModeProtocol;
-
-
-        // 船只控制 - 电机值 (4字节): 2字节m_motor1 + 2字节m_motor2 (小端序)
-        QDataStream motorStream(&data, QIODevice::WriteOnly);
-        motorStream.setByteOrder(QDataStream::LittleEndian); // 设置小端字节序
-        motorStream.device()->seek(controlBlockOffset + 3); // 定位到电机值写入位置
-        motorStream << m_motor1; // 写入电机1值
-        motorStream << m_motor2; // 写入电机2值
-
-        // --- 处理保留区 --- (14字节, 填充0)
-        // 保留区的起始位置在控制指令块之后
-        int reservedAreaOffset = controlBlockOffset + CONTROL_BLOCK_SIZE;
-        data.resize(reservedAreaOffset + RESERVED_SIZE); // 扩展data以包含保留区
-        std::fill(data.begin() + reservedAreaOffset, data.end(), 0); // 用0填充保留区
-
-        // 发送最终组装好的数据包
-        qint64 bytesWritten = serialPort->write(data);
-        if (bytesWritten != data.size()) { // 检查是否完整发送
-            emit error("数据发送不完整");
-            return;
-        }
-        qDebug() << "发送任务指令数据成功，总大小: " << bytesWritten << "字节, 内容: " << data.toHex().toUpper();
-
-    } catch (const std::exception& e) { // 捕获标准异常
-        QString errorMsg = QString("发送数据时发生异常: %1").arg(e.what());
-        qDebug() << errorMsg;
-        emit error(errorMsg);
-    }
-}
+// @deprecated 旧的发送任务点数据接口，已被新的 buildOutgoingPacket 和 handleMissionCommand 取代。
+// void DataSource::sendData(const std::vector<QString>& taskPointsData)
+// {
+//     // ... implementation removed ...
+// }
 
 
 // 处理串口发生的错误
@@ -812,5 +655,156 @@ void DataSource::handleDeviceControl(const DeviceControlDto& controlCmd)
     // sendData()的调用由其他逻辑触发 (例如TaskPointSelector.qml中的“发送航点”按钮)。
     // 当sendData被调用时，它将使用这里更新的m_pumpState, m_pump_mode, m_boat_mode, m_motor1, m_motor2成员变量
     // 来构建发送给硬件的串口数据包。
-    qDebug() << "DataSource: Internal state updated by DTO. Ready for next sendData call.";
+    qDebug() << "DataSource: Internal state updated by DTO. Ready for next sendData/buildOutgoingPacket call.";
+
+    // 新增：立即构建并发送数据包
+    if (!serialPort->isOpen()) {
+        qDebug() << "DataSource::handleDeviceControl: 串口未打开，无法发送控制指令。";
+        // emit error("串口未打开，无法发送控制指令"); // 暂时不发送错误，避免QML频繁弹窗
+        return;
+    }
+
+    QByteArray packet = buildOutgoingPacket(); // 构建不含任务点的数据包
+    if (!packet.isEmpty()) {
+        qint64 bytesWritten = serialPort->write(packet);
+        if (bytesWritten == packet.size()) {
+            qDebug() << "DataSource::handleDeviceControl: 控制指令发送成功，大小:" << bytesWritten << "字节, 内容:" << packet.toHex().toUpper();
+        } else {
+            emit error("控制指令发送不完整");
+            qDebug() << "DataSource::handleDeviceControl: 控制指令发送不完整. 应发:" << packet.size() << "实发:" << bytesWritten;
+        }
+    } else {
+        qDebug() << "DataSource::handleDeviceControl: 构建的数据包为空，未发送。";
+    }
+}
+
+// 新增：构建待发送的完整数据包的私有方法
+// 如果 missionCmd 为 nullptr，则只发送控制指令和默认/空任务点。
+// 否则，使用 missionCmd 中的任务点数据。
+QByteArray DataSource::buildOutgoingPacket(const MissionCommandDto* missionCmd)
+{
+    QByteArray data; // 创建数据包字节数组
+
+    // --- 帧头和同步字节 ---
+    data.append(static_cast<char>(FRAME_HEADER));
+    data.append(static_cast<char>(FRAME_TRAILER)); // 根据旧sendData逻辑，第二个字节是TRAILER
+
+    // --- 时间戳 ---
+    qint64 timestamp_sec = QDateTime::currentSecsSinceEpoch(); // 默认使用当前时间戳
+    if (missionCmd && !missionCmd->homePoint.timestamp.isEmpty()) {
+        std::tm tm_ts = {};
+        std::istringstream ss_ts(missionCmd->homePoint.timestamp.toStdString());
+        // 假设时间戳格式为 "yyyy-MM-dd hh:mm:ss"
+        ss_ts >> std::get_time(&tm_ts, "%Y-%m-%d %H:%M:%S");
+        if (!ss_ts.fail()) {
+            timestamp_sec = static_cast<qint64>(std::mktime(&tm_ts));
+        } else {
+            qWarning() << "DataSource::buildOutgoingPacket: Home点时间戳解析失败:" << missionCmd->homePoint.timestamp << "将使用当前时间。";
+        }
+    }
+    QDataStream timeStream(&data, QIODevice::Append); // 使用Append模式
+    timeStream.setByteOrder(QDataStream::LittleEndian);
+    timeStream << timestamp_sec;
+    // qDebug() << "  写入时间戳:" << timestamp_sec;
+
+
+    // --- Home点 ---
+    // 即使missionCmd为nullptr，协议也需要Home点占位
+    MissionPointDto homePointToUse; // 默认构造 (0,0,空串)
+    if (missionCmd && isValidGpsCoordinate(missionCmd->homePoint.latitude, missionCmd->homePoint.longitude)) {
+        homePointToUse = missionCmd->homePoint;
+    } else if (missionCmd) {
+         qWarning() << "DataSource::buildOutgoingPacket: 提供的Home点坐标无效，使用默认Home点(0,0)。";
+    } else {
+         // missionCmd is nullptr, use default homePointToUse
+    }
+
+    int lonInt_home = static_cast<int>(homePointToUse.longitude);
+    data.append(static_cast<char>(lonInt_home));
+    float lonDecimal_home = static_cast<float>(homePointToUse.longitude - lonInt_home);
+    data.append(reinterpret_cast<const char*>(&lonDecimal_home), sizeof(lonDecimal_home));
+
+    int latInt_home = static_cast<int>(homePointToUse.latitude);
+    data.append(static_cast<char>(latInt_home));
+    float latDecimal_home = static_cast<float>(homePointToUse.latitude - latInt_home);
+    data.append(reinterpret_cast<const char*>(&latDecimal_home), sizeof(latDecimal_home));
+    // qDebug() << "  写入Home点: Lat" << homePointToUse.latitude << "Lon" << homePointToUse.longitude;
+
+    // --- 任务航点 ---
+    int validWaypointCount = 0;
+    if (missionCmd) {
+        for (const MissionPointDto& waypointDto : missionCmd->waypoints) {
+            if (validWaypointCount >= MAX_TASK_POINTS) {
+                qDebug() << "DataSource::buildOutgoingPacket: 任务点数量超出限制 (" << MAX_TASK_POINTS << ")。";
+                break;
+            }
+            if (!isValidGpsCoordinate(waypointDto.latitude, waypointDto.longitude)) {
+                qWarning() << "DataSource::buildOutgoingPacket: 无效的任务点GPS坐标: Lat" << waypointDto.latitude << "Lon" << waypointDto.longitude;
+                continue;
+            }
+
+            int lonInt_wp = static_cast<int>(waypointDto.longitude);
+            data.append(static_cast<char>(lonInt_wp));
+            float lonDecimal_wp = static_cast<float>(waypointDto.longitude - lonInt_wp);
+            data.append(reinterpret_cast<const char*>(&lonDecimal_wp), sizeof(lonDecimal_wp));
+
+            int latInt_wp = static_cast<int>(waypointDto.latitude);
+            data.append(static_cast<char>(latInt_wp));
+            float latDecimal_wp = static_cast<float>(waypointDto.latitude - latInt_wp);
+            data.append(reinterpret_cast<const char*>(&latDecimal_wp), sizeof(latDecimal_wp));
+            validWaypointCount++;
+        }
+    }
+    // 如果任务点不足MAX_TASK_POINTS，需要用0填充剩余的任务点空间吗？
+    // 根据旧sendData逻辑，它会根据实际点数resize，不固定填充。
+    // 当前协议似乎是动态大小的，取决于validWaypointCount。
+    // 但控制块和保留区的位置是基于实际发送的点数。
+    // int currentPointsSize = HOME_POINT_SIZE + validWaypointCount * TASK_POINT_SIZE;
+    // int expectedMinPacketSizeWithoutWaypoints = FRAME_HEADER_SIZE + TIMESTAMP_LENGTH + HOME_POINT_SIZE + CONTROL_BLOCK_SIZE + RESERVED_SIZE;
+
+    // --- 控制指令块 ---
+    // 控制指令块的起始偏移量: FRAME_HEADER_SIZE + TIMESTAMP_LENGTH + HOME_POINT_SIZE + validWaypointCount * TASK_POINT_SIZE
+    // 我们是Append模式，所以不需要计算绝对偏移，直接追加即可。
+
+    data.append(m_pump_mode ? 1 : 0); // 水泵模式
+    data.append(m_pumpState ? 1 : 0); // 水泵状态
+
+    uint8_t boatModeProtocolVal = 0; // 默认为手动
+    if (m_boat_mode) { // m_boat_mode true 代表自动
+        boatModeProtocolVal = 1; // 自动
+    }
+    // PositionHold 的处理: handleDeviceControl将PositionHold映射为m_boat_mode=false.
+    // 如果需要区分PositionHold，需要修改m_boat_mode类型或此处的映射逻辑。
+    data.append(boatModeProtocolVal); // 船只模式
+    // qDebug() << "  写入控制块: PumpMode" << (m_pump_mode?1:0) << "PumpState" << (m_pumpState?1:0) << "BoatMode(m_boat_mode)" << boatModeProtocolVal;
+
+
+    QDataStream controlStream(&data, QIODevice::Append);
+    controlStream.setByteOrder(QDataStream::LittleEndian);
+    controlStream << m_motor1; // 电机1
+    controlStream << m_motor2; // 电机2
+    // qDebug() << "  写入电机值: M1=" << m_motor1 << "M2=" << m_motor2;
+
+    // --- 保留区 ---
+    data.append(QByteArray(RESERVED_SIZE, 0)); // 用0填充保留区
+    // qDebug() << "  填充保留区，最终数据包大小:" << data.size();
+
+    // 验证数据包总长度是否符合预期 (如果协议是固定长度的话)
+    // int expectedSize = FRAME_HEADER_SIZE + TIMESTAMP_LENGTH + HOME_POINT_SIZE +
+    //                    MAX_TASK_POINTS * TASK_POINT_SIZE + CONTROL_BLOCK_SIZE + RESERVED_SIZE;
+    // if (data.size() != expectedSize) {
+    //     qWarning() << "DataSource::buildOutgoingPacket: 构建的数据包大小 (" << data.size() << ") 与预期大小 (" << expectedSize << ") 不符 (基于MAX_TASK_POINTS)。";
+    // }
+    // 当前协议似乎是动态大小，取决于实际航点数。
+    // 最小包(0个任务点): 2(头)+8(时间戳)+10(Home)+0(任务点)+7(控制)+14(保留) = 41字节
+    // 最大包(MAX_TASK_POINTS个任务点): 41 + MAX_TASK_POINTS * 10
+    int expectedMinSize = FRAME_HEADER_SIZE + TIMESTAMP_LENGTH + HOME_POINT_SIZE + CONTROL_BLOCK_SIZE + RESERVED_SIZE;
+    int expectedSizeWithWaypoints = expectedMinSize + validWaypointCount * TASK_POINT_SIZE;
+
+    if (data.size() != expectedSizeWithWaypoints) {
+         qWarning() << "DataSource::buildOutgoingPacket: 构建的数据包大小 (" << data.size() << ") 与预期大小 (" << expectedSizeWithWaypoints << ") 不符。";
+         // 这可能意味着在resize或append过程中存在逻辑错误。
+    }
+
+    return data;
 }

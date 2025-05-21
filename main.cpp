@@ -23,45 +23,27 @@ int main(int argc, char *argv[]) {
     // qmlRegisterType<DataSource>("Modules", 1, 0, "DataSource");
     // qmlRegisterType<Database>("Modules", 1, 0, "Database");
 
-    // 模块实例
+    // --- 模块实例化 ---
+    // 数据源 (通常作为指针，因为它可能被多个模块共享或传递，且生命周期由main管理)
+    DataSource* dataSource = new DataSource();
+
+    // UI模块 (通常作为栈对象，生命周期随main)
     SensorModule sensorModule;
     VesselModule vesselModule;
-    DeviceModule deviceModule;
-    //DataSource dataSource;
+    DeviceModule deviceModule; // 标准DeviceModule实例
     Database database;
-    DataSource* dataSource =new DataSource();
-    DeviceModule* deviceModuleWithDataSource = new DeviceModule(dataSource);
 
+    // DeviceModule* deviceModuleWithDataSource = new DeviceModule(dataSource); // 此旧实例已移除
 
-    if (!database.initialize()) {
-        qDebug() << "Failed to initialize database.";
-        return -1;
-    }
-
-    // 信号槽连接，用于接收和处理来自DataSource的数据
-    // QObject::connect(dataSource, &DataSource::sensorDataReceived, &sensorModule, &SensorModule::receiveData); // 旧的传感器连接方式
-    // QObject::connect(dataSource, &::DataSource::vesselDataReceived, &vesselModule, &VesselModule::receiveData); // 旧的船体连接方式，已移除
-    // QObject::connect(dataSource, &DataSource::deviceDataReceived, &deviceModule, &DeviceModule::receiveData); // 旧的设备连接方式
-
-    // 模块实例
-    SensorModule sensorModule;
-    VesselModule vesselModule;
-    // DeviceModule deviceModule; // 旧的DeviceModule实例，将被替换
-    Database database;
-    DataSource* dataSource = new DataSource(); // 数据源保持指针，因为它被多个模块共享或传递
-    DeviceModule deviceModule; // 新的DeviceModule实例，不再需要DataSource构造函数注入
-    // DeviceModule* deviceModuleWithDataSource = new DeviceModule(dataSource); // 此行将被移除或调整
-
-
+    // --- 初始化数据库 ---
     if (!database.initialize()) {
         qDebug() << "数据库初始化失败。"; // 更新为中文
         return -1;
     }
 
-    // 信号槽连接，用于接收和处理来自DataSource的数据
-    // QObject::connect(dataSource, &DataSource::deviceDataReceived, &deviceModule, &DeviceModule::receiveData); // 旧的设备连接方式
+    // --- 信号槽连接 ---
 
-    // 新的DTO信号槽连接
+    // DTO信号槽连接 (DataSource -> UI模块)
     QObject::connect(dataSource, &DataSource::vesselStateUpdated, &vesselModule, &VesselModule::handleVesselStateUpdated); // 船体状态更新
     QObject::connect(dataSource, &DataSource::sensorDataUpdated, &sensorModule, &SensorModule::handleSensorDataUpdated);   // 传感器数据更新
     QObject::connect(dataSource, &DataSource::deviceStatusUpdated, &deviceModule, &DeviceModule::handleDeviceStatusUpdated); // 新增: 设备状态更新
@@ -105,33 +87,19 @@ int main(int argc, char *argv[]) {
     // 注册C++模块到QML上下文，使其可以在QML中被访问
     engine.rootContext()->setContextProperty("sensorModule", &sensorModule); // 传感器模块
     engine.rootContext()->setContextProperty("vesselModule", &vesselModule); // 船体模块
-    engine.rootContext()->setContextProperty("deviceModule", &deviceModule); // 设备模块 (已更新为DTO)
-    engine.rootContext()->setContextProperty("dataSource", dataSource); // 数据源
-    engine.rootContext()->setContextProperty("database", &database); // 数据库访问对象
-    // engine.rootContext()->setContextProperty("deviceModuleWithDataSource", deviceModuleWithDataSource); // 此行移除
+    engine.rootContext()->setContextProperty("deviceModule", &deviceModule); // 设备模块 (统一使用此实例)
+    engine.rootContext()->setContextProperty("dataSource", dataSource);     // 数据源
+    engine.rootContext()->setContextProperty("database", &database);         // 数据库访问对象
+    // engine.rootContext()->setContextProperty("deviceModuleWithDataSource", deviceModuleWithDataSource); // 移除对旧实例的注册
 
+    // --- 加载QML ---
     const QUrl url(QStringLiteral("qrc:/main.qml")); // QML主文件路径
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreated, &app, [url](QObject *obj, const QUrl &objUrl) {
         if (!obj && url == objUrl) { // 如果QML对象创建失败且URL匹配，则退出应用
-    });
-
-    // 注册到 QML
-    engine.rootContext()->setContextProperty("sensorModule", &sensorModule);
-    engine.rootContext()->setContextProperty("vesselModule", &vesselModule);
-    engine.rootContext()->setContextProperty("deviceModule", &deviceModule);
-    engine.rootContext()->setContextProperty("dataSource", dataSource);
-    engine.rootContext()->setContextProperty("database", &database);
-    engine.rootContext()->setContextProperty("deviceModuleWithDataSource", deviceModuleWithDataSource);
-
-
-
-    const QUrl url(QStringLiteral("qrc:/main.qml"));
-    QObject::connect(&engine, &QQmlApplicationEngine::objectCreated, &app, [url](QObject *obj, const QUrl &objUrl) {
-        if (!obj && url == objUrl) {
-            QCoreApplication::exit(-1);
+            QCoreApplication::exit(-1); // 退出程序
         }
     }, Qt::QueuedConnection);
-    engine.load(url);
+    engine.load(url); // 加载QML界面
 
 
 

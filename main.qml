@@ -170,17 +170,11 @@ ApplicationWindow {
         }
     }
 
-    // 在适当位置添加数据源连接
-    Connections {
-        target: dataSource
-        function onMergedDataReceived(data) {
-            console.log("收到合并数据，长度: " + data.length);
-
-            // 将数据分发给各个模块
-            sensorModule.receiveData(data);
-            vesselModule.receiveData(data);
-            deviceModule.receiveData(data);
-        }
-    }
-
+    // 旧的数据分发逻辑，已由C++后端DTO信号槽机制取代 (原Connections对象已移除)
+    // Connections {
+    //     target: dataSource
+    //     function onMergedDataReceived(data) {
+    //         // ... (旧逻辑)
+    //     }
+    // }
 }

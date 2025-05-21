@@ -164,25 +164,29 @@ bool Database::insertVesselData(const QString& timestamp,
     return insertTrajectoryData(timestamp, latitude, longitude);
 }
 bool Database::insertDeviceData(const QString& timestamp,
-                                int battery,bool mode) {
-    QSqlQuery query;
+                                int battery, bool mode) {
+    QSqlQuery query; // 创建SQL查询对象
+    // 准备SQL插入语句，目标表是 device_data
     query.prepare(R"(
-        INSERT INTO vessel_data (
-            timestamp,battery,mode
+        INSERT INTO device_data (
+            timestamp, battery, mode
         ) VALUES (
             :timestamp, :battery, :mode
         )
     )");
 
-    query.bindValue(":timestamp", timestamp);
-    query.bindValue(":battery", battery);
-    query.bindValue(":mode", mode);
+    // 绑定参数值
+    query.bindValue(":timestamp", timestamp); // 绑定时间戳
+    query.bindValue(":battery", battery);     // 绑定电池电量
+    query.bindValue(":mode", mode);           // 绑定操作模式
 
-    if (!query.exec()) {
-        qDebug() << "Failed to insert device data:" << query.lastError().text();
-        return false;
+    if (!query.exec()) { // 执行查询
+        // 如果执行失败，打印错误信息
+        qDebug() << "插入设备数据失败:" << query.lastError().text();
+        return false; // 返回失败
     }
-    return true;
+    // qDebug() << "设备数据插入成功: Timestamp=" << timestamp << "Battery=" << battery << "Mode=" << mode;
+    return true; // 返回成功
 }
 
 bool Database::insertTrajectoryData(const QString& timestamp,

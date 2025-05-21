@@ -95,11 +95,11 @@ Rectangle {
 
         // 水泵模式控制 ▼▼▼
         TopBarButton {
-            text: pumpAutoMode ? "水泵[自动]" : "水泵[手动]"
-            color: pumpAutoMode ? accentColor : Qt.rgba(0.5, 0.5, 0.5, 0.7)
+            text: pumpAutoMode ? "水泵[自动]" : "水泵[手动]" // 文本根据水泵自动模式状态改变
+            color: pumpAutoMode ? accentColor : Qt.rgba(0.5, 0.5, 0.5, 0.7) // 颜色根据水泵自动模式状态改变
             onClicked: {
-                pumpAutoMode = !pumpAutoMode
-                if (deviceModuleWithDataSource) deviceModuleWithDataSource.setPumpAutoMode(pumpAutoMode)
+                pumpAutoMode = !pumpAutoMode // 切换本地的pumpAutoMode属性状态
+                if (deviceModule) deviceModule.setPumpAutoMode(pumpAutoMode) // 调用deviceModule的槽函数
             }
         }
 
@@ -113,11 +113,11 @@ Rectangle {
 
         // 艇模式控制 ▼▼▼
         TopBarButton {
-            text: boatAutoMode ? "航行[自动]" : "航行[手动]"
-            color: boatAutoMode ? accentColor : Qt.rgba(0.5, 0.5, 0.5, 0.7)
+            text: boatAutoMode ? "航行[自动]" : "航行[手动]" // 文本根据船只自动模式状态改变
+            color: boatAutoMode ? accentColor : Qt.rgba(0.5, 0.5, 0.5, 0.7) // 颜色根据船只自动模式状态改变
             onClicked: {
-                boatAutoMode = !boatAutoMode
-                if (deviceModuleWithDataSource) deviceModuleWithDataSource.setBoatAutoMode(boatAutoMode)
+                boatAutoMode = !boatAutoMode // 切换本地的boatAutoMode属性状态
+                if (deviceModule) deviceModule.setBoatAutoMode(boatAutoMode) // 调用deviceModule的槽函数
             }
         }
 
