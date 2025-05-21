@@ -73,7 +73,7 @@ USV_Visualization_Monitor/  # Repository Root
 ├── Visualization.pro       # qmake 项目配置文件, 定义了源码、资源和依赖
 ├── main.cpp                # C++ 程序主入口, 初始化Qt应用和QML引擎
 ├── qml.qrc                 # Qt 资源文件, 编译QML文件、图片等资源到可执行文件中
-│   └── qml/                # 存放QML文件的主要目录 (假设, 根据QML_IMPORT_PATH)
+│   └── qml/                # 存放QML文件的主要目录 (通常由 QML_IMPORT_PATH 或 qmldir 指向)
 │       ├── BoatStatusPanel.qml
 │       ├── HistoryDataWindow.qml
 │       ├── MapViewPanel.qml
@@ -82,15 +82,21 @@ USV_Visualization_Monitor/  # Repository Root
 │       ├── SerialControlPanel.qml
 │       ├── SettingsDialog.qml
 │       ├── TaskPointSelector.qml
-│       └── TopMessageBar.qml
-│       └── main.qml        # QML应用的入口文件 (通常命名为此)
-├── *.cpp / *.h             # C++源文件和头文件, 实现后端逻辑
-│   ├── device_module.cpp/h
-│   ├── sensor_module.cpp/h
-│   ├── vessel_module.cpp/h
-│   ├── datasource.cpp/h
-│   ├── database.cpp/h
-│   └── visualization_base.cpp/h # 可能包含QML可调用对象或全局上下文属性
+│       ├── TopMessageBar.qml
+│       └── main.qml        # QML应用的入口文件 (示例名称)
+├── device_module.cpp
+├── device_module.h
+├── main.cpp
+├── visualization_base.cpp
+├── visualization_base.h
+├── sensor_module.cpp
+├── sensor_module.h
+├── vessel_module.cpp
+├── vessel_module.h
+├── datasource.cpp
+├── datasource.h
+├── database.cpp
+├── database.h
 ├── resources/              # (建议) 存放图标、字体等非QML静态资源
 ├── screenshots/            # (建议) 存放项目截图
 └── README.md               # 本文档
@@ -103,7 +109,7 @@ USV_Visualization_Monitor/  # Repository Root
 **请您务必将程序的实际运行截图添加到项目中的 screenshots 文件夹，并在此处更新以下链接。**
 
 *例如:*
-请替换为您的真实截图和描述！
+请替换为您的真实截图和描述！例如： ![程序概览](./screenshots/your_screenshot_name.jpg)
 
 ---
 
@@ -119,7 +125,7 @@ USV_Visualization_Monitor/  # Repository Root
 
 ### 构建步骤
 
-1.  **克隆仓库**:
+1.  **克隆仓库** (如果您是从其他地方获取此项目):
     \\\ash
     git clone https://github.com/ershiyidian/USV_Visualization_Monitor.git
     cd USV_Visualization_Monitor
@@ -152,7 +158,7 @@ USV_Visualization_Monitor/  # Repository Root
 ## 使用说明
 
 1.  成功构建应用程序后，运行生成的可执行文件。
-2.  [请在此处补充您程序的基本启动和操作流程，例如：]
+2.  **[请在此处补充您程序的基本启动和操作流程，例如：]**
     * 如何通过 SerialControlPanel.qml 配置串口并连接到无人艇设备。
     * 主界面 (BoatStatusPanel.qml, SensorDataPanel.qml) 各个信息区域的含义。
     * 如何查看历史数据 (HistoryDataWindow.qml) 或地图轨迹 (MapViewPanel.qml)。
@@ -187,7 +193,30 @@ USV_Visualization_Monitor/  # Repository Root
 
 ## 许可证
 
-本项目采用 [MIT 许可证](LICENSE.md)。请在项目根目录创建 LICENSE.md 文件并复制 MIT 许可证的完整文本。您可以在 [choosealicense.com/licenses/mit/](https://choosealicense.com/licenses/mit/) 找到许可证文本。
+本项目采用 **MIT 许可证**。请在项目根目录创建 LICENSE.md 文件并包含以下内容：
+\\\	ext
+MIT License
+
+Copyright (c) 2025 ershiyidian
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+\\\
 
 ---
 
@@ -198,4 +227,4 @@ USV_Visualization_Monitor/  # Repository Root
 * **项目仓库**: [https://github.com/ershiyidian/USV_Visualization_Monitor](https://github.com/ershiyidian/USV_Visualization_Monitor)
 
 ---
-*本文档最后更新于: 2025-05-21 11:40:01*
+*本文档最后更新于: 2025-05-21 11:43:40*
