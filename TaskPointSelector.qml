@@ -327,15 +327,48 @@ Rectangle {
 
                     console.log("准备发送点的数据：", stringArray);
 
-                    // 调用数据源发送数据
+                    // 调用DeviceModule发送任务指令
                     try {
-                        if (dataSource && stringArray.length > 0) {
-                            dataSource.sendData(stringArray);
-                            warningMessage.showWarning("任务点已发送 (" + Math.min(taskPoints.length, maxPoints) + " 个点)", successColor);
+                        if (mapViewPanel.homePoint && taskPoints.length > 0) {
+                            var homeData = {
+                                "latitude": mapViewPanel.homePoint.coordinate.latitude,
+                                "longitude": mapViewPanel.homePoint.coordinate.longitude,
+                                "timestamp": Qt.formatDateTime(new Date(mapViewPanel.homePoint.timestamp), "yyyy-MM-dd hh:mm:ss")
+                            };
+
+                            var waypointsData = [];
+                            for (var i = 0; i < taskPoints.length; i++) {
+                                var point = taskPoints[i];
+                                var pointTimestamp = "";
+                                if (typeof point.timestamp === 'string') {
+                                    pointTimestamp = point.timestamp; // 假设已是正确格式
+                                } else if (point.timestamp instanceof Date) {
+                                    pointTimestamp = Qt.formatDateTime(point.timestamp, "yyyy-MM-dd hh:mm:ss");
+                                } else {
+                                    pointTimestamp = Qt.formatDateTime(new Date(), "yyyy-MM-dd hh:mm:ss"); // 默认当前时间
+                                }
+                                waypointsData.push({
+                                                   "latitude": point.latitude,
+                                                   "longitude": point.longitude,
+                                                   "timestamp": pointTimestamp
+                                               });
+                            }
+
+                            // console.log("QML: Preparing to send mission command via DeviceModule");
+                            // console.log("QML: Home Point Data:", JSON.stringify(homeData));
+                            // console.log("QML: Waypoints Data:", JSON.stringify(waypointsData));
+
+                            deviceModule.sendMissionCommand(homeData, waypointsData);
+                            warningMessage.showWarning("任务指令已发送 (" + taskPoints.length + " 个航点)", successColor);
+
+                        } else if (!mapViewPanel.homePoint) {
+                             warningMessage.showWarning("未设置Home点！", warningColor);
+                        } else {
+                             warningMessage.showWarning("请添加至少一个任务点！", warningColor);
                         }
                     } catch (e) {
-                        warningMessage.showWarning("发送失败: " + e, dangerColor);
-                        console.error("发送任务点时出错:", e);
+                        warningMessage.showWarning("发送任务指令失败: " + e, dangerColor);
+                        console.error("调用 deviceModule.sendMissionCommand 时出错:", e);
                     }
                 }
 

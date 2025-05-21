@@ -7,6 +7,8 @@
 #include <QStringList>
 #include <QElapsedTimer>
 
+#include "DataTransferObjects.h" // <-- 新增: 包含DTO头文件
+
 // 数据帧常量定义
 namespace FrameConstants {
 // 帧大小常量
@@ -122,94 +124,55 @@ class DataSource : public QObject {
     Q_PROPERTY(QStringList availablePorts READ availablePorts NOTIFY availablePortsChanged)
     Q_PROPERTY(bool pumpState READ pumpState WRITE setPumpState NOTIFY pumpStateChanged)
     Q_PROPERTY(quint16 motor1 READ motor1 WRITE setMotor1 NOTIFY motor1Changed)
-    Q_PROPERTY(quint16 motor2 READ motor2 WRITE setMotor2 NOTIFY motor2Changed)
-    Q_PROPERTY(bool pump_mode READ pump_mode WRITE updatePumpModeInDataSource NOTIFY pump_modeChanged)
-    Q_PROPERTY(bool boat_mode READ boat_mode WRITE updateBoatModeInDataSource NOTIFY boat_modeChanged)
+    Q_PROPERTY(quint16 motor2 READ motor2 WRITE setMotor2 NOTIFY motor2Changed) // 电机2输出值属性
+    Q_PROPERTY(bool pump_mode READ pump_mode WRITE updatePumpModeInDataSource NOTIFY pump_modeChanged) // 水泵模式属性 (false=手动, true=自动)
+    Q_PROPERTY(bool boat_mode READ boat_mode WRITE updateBoatModeInDataSource NOTIFY boat_modeChanged) // 船只模式属性 (false=手动, true=自动)
 public:
-    // 传感器数据结构
-    struct SensorData {
-        uint16_t PWM_SET1;        // 电机1 PWM
-        uint16_t PWM_SET2;        // 电机2 PWM
-        uint16_t CO2;             // CO2浓度 (ppm)
-        uint16_t CH2O;            // 甲醛浓度 (ppb)
-        uint16_t TVOC;            // 总挥发性有机物 (ppb)
-        uint16_t PM2_5;           // PM2.5 (μg/m³)
-        uint16_t PM10;            // PM10 (μg/m³)
-        uint8_t temperature_air_High; // 空气温度高字节
-        uint8_t temperature_air_Low;  // 空气温度低字节
-        uint8_t humidity_air_High;    // 空气湿度高字节
-        uint8_t humidity_air_Low;     // 空气湿度低字节
-        uint16_t turbidity;       // 浊度 (NTU)
-        uint16_t PH;              // pH值 * 100
-        uint16_t TDS;             // 总溶解固体 (ppm)
-        uint8_t temperaturewater_High; // 水温高字节
-        uint8_t temperaturewater_Low;  // 水温低字节
-        int16_t dis;              // 液位值 (mm)
-    };
-
-    // 船只数据结构
-    struct BoatData {
-        double latitude;          // 纬度
-        double longitude;         // 经度
-        double speed;             // 速度 (m/s)
-        double heading;           // 航向角 (-180~180°)
-    };
-
-    // 设备数据结构
-    struct DeviceData {
-        uint16_t battery;         // 电池电量 (%)
-        bool mode;                // 工作模式 (0=手动, 1=自动)
-    };
-
-    // 任务点数据结构
-    struct TaskPointData {
-        double latitude;          // 纬度
-        double longitude;         // 经度
-        bool isHomePoint;         // 是否为Home点
-        std::time_t timestamp;    // 时间戳
-    };
-
-    explicit DataSource(QObject *parent = nullptr);
-    ~DataSource();
+    explicit DataSource(QObject *parent = nullptr); // 构造函数
+    ~DataSource(); // 析构函数
 
     // 属性访问器
-    bool pumpState() const { return m_pumpState; }
-    bool pump_mode() const {return m_pump_mode; }
-    bool boat_mode() const {return m_boat_mode; }
-    quint16 motor1() const { return m_motor1; }
-    quint16 motor2() const { return m_motor2; }
-    QStringList availablePorts() const { return m_availablePorts; }
-    bool isPortOpen() const { return serialPort->isOpen(); }
-    bool isSimulating() const { return m_isSimulating; }
-    QString mergedFrameHeader() const { return m_mergedFrameHeader; }
-    QString mergedFrameTrailer() const { return m_mergedFrameTrailer; }
+    bool pumpState() const { return m_pumpState; } // 获取水泵状态
+    bool pump_mode() const {return m_pump_mode; } // 获取水泵模式
+    bool boat_mode() const {return m_boat_mode; } // 获取船只模式
+    quint16 motor1() const { return m_motor1; } // 获取电机1的值
+    quint16 motor2() const { return m_motor2; } // 获取电机2的值
+    QStringList availablePorts() const { return m_availablePorts; } // 获取可用串口列表
+    bool isPortOpen() const { return serialPort->isOpen(); } // 检查串口是否打开
+    bool isSimulating() const { return m_isSimulating; } // 检查是否处于模拟模式
+    QString mergedFrameHeader() const { return m_mergedFrameHeader; } // 获取合并帧头 (十六进制字符串)
+    QString mergedFrameTrailer() const { return m_mergedFrameTrailer; } // 获取合并帧尾 (十六进制字符串)
 
-    // Q_INVOKABLE方法(从QML可调用)
-    Q_INVOKABLE bool openSerialPort(const QString& portName, int baudRate);
-    Q_INVOKABLE void closeSerialPort();
+    // Q_INVOKABLE方法 (可从QML调用)
+    Q_INVOKABLE bool openSerialPort(const QString& portName, int baudRate); // 打开串口
+    Q_INVOKABLE void closeSerialPort(); // 关闭串口
 
-    // 数据有效性检查
-    bool isValidMotorValue(quint16 value) const;
-    bool isValidGpsCoordinate(double lat, double lon) const;
+    // 数据有效性检查方法
+    bool isValidMotorValue(quint16 value) const; // 检查电机值是否在有效范围内
+    bool isValidGpsCoordinate(double lat, double lon) const; // 检查GPS坐标是否有效
 
 public slots:
-    void setIsSimulating(bool enabled);
-    void setMergedFrameHeader(const QString& header);
-    void setMergedFrameTrailer(const QString& trailer);
-    void sendData(const std::vector<QString>& taskPointsData);
-    void setPumpState(bool state);
-    void setMotor1(quint16 value);
-    void setMotor2(quint16 value);
-    void updatePumpModeInDataSource(bool mode);
-    void updateBoatModeInDataSource(bool mode);
+    void setIsSimulating(bool enabled); // 设置是否启用数据模拟
+    void setMergedFrameHeader(const QString& header); // 设置合并帧头 (十六进制字符串)
+    void setMergedFrameTrailer(const QString& trailer); // 设置合并帧尾 (十六进制字符串)
+    void sendData(const std::vector<QString>& taskPointsData); // @deprecated 旧的发送任务点数据接口，将由handleMissionCommand取代
+    void setPumpState(bool state); // 设置水泵开启/关闭状态
+    void setMotor1(quint16 value); // 设置电机1的输出值
+    void setMotor2(quint16 value); // 设置电机2的输出值
+    void updatePumpModeInDataSource(bool mode); // @deprecated 更新水泵的工作模式 (手动/自动) -已被新的控制流程取代
+    void updateBoatModeInDataSource(bool mode); // @deprecated 更新船只的工作模式 (手动/自动) -已被新的控制流程取代
+    void handleDeviceControl(const DeviceControlDto& controlCmd); // 处理来自DeviceModule的设备控制指令
+    void handleMissionCommand(const MissionCommandDto& missionCmd); // 新增: 处理来自DeviceModule的任务指令
+
 signals:
-    void sensorDataReceived(const QString& data);
-    void vesselDataReceived(const QString& data);
-    void deviceDataReceived(const QString& data);
-    void mergedDataReceived(const QString& data);
-    void error(const QString& message);
-    void portOpenChanged();
-    void availablePortsChanged();
+    // 新的DTO信号 - 用于通知数据更新
+    void sensorDataUpdated(const SensorDataDto& sensorData);     // 传感器数据更新信号 (DTO)
+    void vesselStateUpdated(const VesselStateDto& vesselState);   // 船体状态更新信号 (DTO)
+    void deviceStatusUpdated(const DeviceStatusDto& deviceStatus); // 设备状态更新信号 (DTO)
+
+    void error(const QString& message); // 错误信息信号
+    void portOpenChanged(); // 串口打开状态变更信号
+    void availablePortsChanged(); // 可用串口列表变更信号
     void isSimulatingChanged();
     void mergedFrameHeaderChanged();
     void mergedFrameTrailerChanged();
@@ -224,48 +187,48 @@ private:
     quint16 m_motor1 = FrameConstants::MOTOR_NEUTRAL;
     quint16 m_motor2 = FrameConstants::MOTOR_NEUTRAL;
     QStringList m_availablePorts;
-    bool m_isSimulating = false;
-    QString m_mergedFrameHeader;
-    QString m_mergedFrameTrailer;
-    bool m_pump_mode=false;
-    bool m_boat_mode=false;
+    bool m_isSimulating = false; // 当前是否处于数据模拟状态
+    QString m_mergedFrameHeader; // 合并帧头字符串 (十六进制)
+    QString m_mergedFrameTrailer; // 合并帧尾字符串 (十六进制)
+    bool m_pump_mode = false; // 水泵模式 (false=手动, true=自动)
+    bool m_boat_mode = false; // 船只模式 (false=手动, true=自动)
+
     // 私有对象
-    QSerialPort* serialPort;
-    QTimer* portUpdateTimer;
-    QTimer* simulationTimer;
-    QByteArray buffer;
-    QElapsedTimer m_simulationElapsedTimer;
+    QSerialPort* serialPort; // 串口对象
+    QTimer* portUpdateTimer; // 串口列表更新定时器
+    QTimer* simulationTimer; // 数据模拟定时器
+    QByteArray buffer; // 串口数据接收缓冲区
+    QElapsedTimer m_simulationElapsedTimer; // 模拟持续时间计时器
 
     // 模拟数据生成相关变量
-    double m_simulatedLatitude;
-    double m_simulatedLongitude;
-    double m_simulatedHeading = 0.0;
-    double m_simulatedSpeed = 0.0;
-    uint16_t m_simulatedBattery = 100;
-    bool m_simulatedMode = false;
+    double m_simulatedLatitude;    // 模拟的纬度
+    double m_simulatedLongitude;   // 模拟的经度
+    double m_simulatedHeading = 0.0; // 模拟的航向
+    double m_simulatedSpeed = 0.0;   // 模拟的速度
+    uint16_t m_simulatedBattery = 100; // 模拟的电池电量
+    bool m_simulatedMode = false;    // 模拟的船只操作模式 (false=手动, true=自动)
 
     // 私有方法
-    QByteArray parseHexString(const QString& hexStr);
-    bool isValidFrame(const QByteArray& data);
-    void processReceivedData(const QByteArray& data);
-    void readSerialData();
-    void handleSerialError(QSerialPort::SerialPortError error);
-    void checkAvailablePorts();
-    void generateFakeData();
-    QByteArray generateMergedFrame();
-    int calculateFrameSize(const QByteArray& data);
+    QByteArray parseHexString(const QString& hexStr); // 解析十六进制字符串为字节数组
+    bool isValidFrame(const QByteArray& data); // 校验接收的数据帧的帧头帧尾是否匹配
+    void processReceivedData(const QByteArray& data); // 处理从串口接收到的原始数据，解析并发送DTO信号
+    void readSerialData(); // 当串口有数据可读时调用此方法
+    void handleSerialError(QSerialPort::SerialPortError error); // 处理串口发生的错误
+    void checkAvailablePorts(); // 定期检查系统中的可用串口列表
+    void generateFakeData(); // 生成模拟的传感器、船体和设备数据 (DTOs) 并发送信号
+    // QByteArray generateMergedFrame(); // 此函数已从 .cpp 中移除，其声明在此处注释掉或删除
+    int calculateFrameSize(const QByteArray& data); // 根据帧定义计算期望的帧大小
 
-    // 数据转换方法
-    double convertAirTemperature(uint8_t high, uint8_t low);
-    double convertWaterTemperature(uint8_t high, uint8_t low);
-    uint16_t convertFromLittleEndian(uint8_t low, uint8_t high);
+    // 数据转换辅助方法
+    double convertAirTemperature(uint8_t high, uint8_t low); // 将高低字节组合为空气温度值
+    double convertWaterTemperature(uint8_t high, uint8_t low); // 将高低字节组合为水体温度值
+    uint16_t convertFromLittleEndian(uint8_t low, uint8_t high); // 将小端序的两个字节转换为uint16_t
 
-    // 生成模拟传感器数据
-    SensorData generateFakeSensorData();
-    // 生成模拟船只数据
-    BoatData generateFakeBoatData();
-    // 生成模拟设备数据
-    DeviceData generateFakeDeviceData();
-    // 更新模拟移动轨迹
-    void updateSimulatedPosition();
+    // DTO模拟数据生成函数的声明 (这些函数在.cpp中实现)
+    SensorDataDto generateFakeSensorDataDto();       // 生成模拟的传感器数据DTO
+    VesselStateDto generateFakeVesselStateDto();     // 生成模拟的船体状态DTO
+    DeviceStatusDto generateFakeDeviceStatusDto();   // 生成模拟的设备状态DTO
+
+    // 更新模拟数据中的船只位置和状态
+    void updateSimulatedPosition(); // 更新模拟的船只位置、航向、速度等
 };

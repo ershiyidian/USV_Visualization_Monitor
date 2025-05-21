@@ -4,6 +4,7 @@
 #include "vessel_module.h"
 #include "datasource.h"
 #include "database.h"
+#include "DataTransferObjects.h" // 新增: 包含DTO头文件
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
@@ -37,27 +38,81 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    // 信号槽连接，解析传感器和船舶数据
-    QObject::connect(dataSource, &DataSource::sensorDataReceived, &sensorModule, &SensorModule::receiveData);
-    QObject::connect(dataSource, &::DataSource::vesselDataReceived, &vesselModule, &VesselModule::receiveData);
-    QObject::connect(dataSource, &DataSource::deviceDataReceived, &deviceModule, &DeviceModule::receiveData);
+    // 信号槽连接，用于接收和处理来自DataSource的数据
+    // QObject::connect(dataSource, &DataSource::sensorDataReceived, &sensorModule, &SensorModule::receiveData); // 旧的传感器连接方式
+    // QObject::connect(dataSource, &::DataSource::vesselDataReceived, &vesselModule, &VesselModule::receiveData); // 旧的船体连接方式，已移除
+    // QObject::connect(dataSource, &DataSource::deviceDataReceived, &deviceModule, &DeviceModule::receiveData); // 旧的设备连接方式
+
+    // 模块实例
+    SensorModule sensorModule;
+    VesselModule vesselModule;
+    // DeviceModule deviceModule; // 旧的DeviceModule实例，将被替换
+    Database database;
+    DataSource* dataSource = new DataSource(); // 数据源保持指针，因为它被多个模块共享或传递
+    DeviceModule deviceModule; // 新的DeviceModule实例，不再需要DataSource构造函数注入
+    // DeviceModule* deviceModuleWithDataSource = new DeviceModule(dataSource); // 此行将被移除或调整
 
 
-    // 连接数据解析后插入数据库
-    QObject::connect(&sensorModule, &SensorModule::sensorDataParsed, [&](int co2, int ch2o, int tvoc, int pm25, int pm10,
-                                                                         double airTemp, double humidity, int turbidity, double ph, int tds, double waterTemp, int levelValue){
+    if (!database.initialize()) {
+        qDebug() << "数据库初始化失败。"; // 更新为中文
+        return -1;
+    }
+
+    // 信号槽连接，用于接收和处理来自DataSource的数据
+    // QObject::connect(dataSource, &DataSource::deviceDataReceived, &deviceModule, &DeviceModule::receiveData); // 旧的设备连接方式
+
+    // 新的DTO信号槽连接
+    QObject::connect(dataSource, &DataSource::vesselStateUpdated, &vesselModule, &VesselModule::handleVesselStateUpdated); // 船体状态更新
+    QObject::connect(dataSource, &DataSource::sensorDataUpdated, &sensorModule, &SensorModule::handleSensorDataUpdated);   // 传感器数据更新
+    QObject::connect(dataSource, &DataSource::deviceStatusUpdated, &deviceModule, &DeviceModule::handleDeviceStatusUpdated); // 新增: 设备状态更新
+
+    // 新增: 设备控制请求的信号槽连接
+    QObject::connect(&deviceModule, &DeviceModule::deviceControlRequested, dataSource, &DataSource::handleDeviceControl);
+    // 新增: 任务指令请求的信号槽连接
+    QObject::connect(&deviceModule, &DeviceModule::missionCommandRequested, dataSource, &DataSource::handleMissionCommand);
+
+
+    // 连接数据更新后插入数据库的信号槽
+
+    // 传感器数据日志记录 (已更新为DTO)
+    QObject::connect(&sensorModule, &SensorModule::sensorDataReadyForLog, [&](const SensorDataDto& sensorDto){
         QString timestamp = QDateTime::currentDateTime().toString(Qt::ISODate);
-        database.insertSensorData(timestamp, co2, ch2o, tvoc, pm25, pm10,
-                                  airTemp, humidity, turbidity, ph, tds, waterTemp, levelValue);
+        database.insertSensorData(timestamp, sensorDto.co2, static_cast<int>(sensorDto.ch2o * 1000),
+                                  static_cast<int>(sensorDto.tvoc * 1000),
+                                  sensorDto.pm25, sensorDto.pm10,
+                                  sensorDto.airTemperature, sensorDto.airHumidity,
+                                  static_cast<int>(sensorDto.waterTurbidity),
+                                  sensorDto.ph,
+                                  static_cast<int>(sensorDto.tds),
+                                  sensorDto.waterTemperature,
+                                  static_cast<int>(sensorDto.waterLevel * 1000));
     });
 
-    QObject::connect(&vesselModule, &VesselModule::vesselDataParsed, [&](double latitude, double longitude, double speed, double heading){
+    // 船体数据日志记录 (已更新为DTO)
+    QObject::connect(&vesselModule, &VesselModule::vesselStateReadyForLog, [&](const VesselStateDto& vesselDto){
         QString timestamp = QDateTime::currentDateTime().toString(Qt::ISODate);
-        database.insertVesselData(timestamp, latitude, longitude, speed, heading);
+        database.insertVesselData(timestamp, vesselDto.latitude, vesselDto.longitude, vesselDto.speed, vesselDto.heading);
     });
-    QObject::connect(&deviceModule, &DeviceModule::deviceDataParsed, [&](int battery,bool mode){
-        QString timestamp = QDateTime::currentDateTime().toString(Qt::ISODate);
-        database.insertDeviceData(timestamp, battery,mode);
+
+    // 更新设备数据日志记录，使用新的DTO信号
+    QObject::connect(&deviceModule, &DeviceModule::deviceStatusReadyForLog, [&](const DeviceStatusDto& deviceDto){
+        QString timestamp = QDateTime::currentDateTime().toString(Qt::ISODate); // 获取当前时间戳
+        // 将DeviceStatusDto中的operationalMode (QString) 转换为bool以匹配insertDeviceData的旧接口
+        bool modeForDb = (deviceDto.operationalMode == "自动"); // 假设 "自动" 映射为 true, "手动" 为 false
+        database.insertDeviceData(timestamp, deviceDto.batteryLevel, modeForDb); // 使用DTO数据插入数据库
+    });
+
+    // 注册C++模块到QML上下文，使其可以在QML中被访问
+    engine.rootContext()->setContextProperty("sensorModule", &sensorModule); // 传感器模块
+    engine.rootContext()->setContextProperty("vesselModule", &vesselModule); // 船体模块
+    engine.rootContext()->setContextProperty("deviceModule", &deviceModule); // 设备模块 (已更新为DTO)
+    engine.rootContext()->setContextProperty("dataSource", dataSource); // 数据源
+    engine.rootContext()->setContextProperty("database", &database); // 数据库访问对象
+    // engine.rootContext()->setContextProperty("deviceModuleWithDataSource", deviceModuleWithDataSource); // 此行移除
+
+    const QUrl url(QStringLiteral("qrc:/main.qml")); // QML主文件路径
+    QObject::connect(&engine, &QQmlApplicationEngine::objectCreated, &app, [url](QObject *obj, const QUrl &objUrl) {
+        if (!obj && url == objUrl) { // 如果QML对象创建失败且URL匹配，则退出应用
     });
 
     // 注册到 QML

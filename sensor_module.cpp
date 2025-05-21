@@ -1,133 +1,75 @@
-#include "sensor_module.h"
+#include "sensor_module.h" // 包含头文件
+#include <QDebug> // 用于调试输出 (如果需要)
 
+// 构造函数
 SensorModule::SensorModule(QObject *parent)
     : VisualizationBase(parent)
 {
+    // 初始化用于QML显示的扁平化数据结构
+    // 键名与Q_PROPERTY的READ函数名(首字母小写)和SensorDataDto的成员名对应
     m_displayData = {
-        {"air", QVariantMap{
-                    {"co2", 0},
-                    {"ch2o", 0},
-                    {"tvoc", 0},
-                    {"pm25", 0},
-                    {"pm10", 0},
-                    {"temperature", 0.0},
-                    {"humidity", 0.0}
-                }},
-        {"water", QVariantMap{
-                      {"turbidity", 0},
-                      {"ph", 0.0},
-                      {"tds", 0},
-                      {"temperature", 0.0}
-                  }},
-        {"level", QVariantMap{
-                      {"value", 0}
-                  }}
+        {"co2", 0},
+        {"ch2o", 0.0},
+        {"tvoc", 0.0},
+        {"pm25", 0},
+        {"pm10", 0},
+        {"airTemperature", 0.0},
+        {"airHumidity", 0.0},    // 对应 DTO 的 airHumidity
+        {"waterTurbidity", 0.0}, // 对应 DTO 的 waterTurbidity
+        {"ph", 0.0},
+        {"tds", 0.0},            // 对应 DTO 的 tds
+        {"waterTemperature", 0.0},
+        {"waterLevel", 0.0}      // 对应 DTO 的 waterLevel
     };
 }
 
-void SensorModule::parseData(const QString& data) {
-    QStringList bytes;
-    for(int i = 0; i < data.length(); i += 2) {
-        bytes.append(data.mid(i, 2));
-    }
+// void SensorModule::parseData(const QString& data) // 旧的解析函数，已移除
+// {
+//     // ... 实现已删除 ...
+// }
 
-    if (bytes.size() < 28) return; // 总长度减去帧头帧尾后的长度
+// void SensorModule::parseAirQuality(const QStringList& data, int& offset) // 旧的辅助解析函数，已移除
+// {
+//     // ... 实现已删除 ...
+// }
 
-    int offset = 0;
+// void SensorModule::parseWaterQuality(const QStringList& data, int& offset) // 旧的辅助解析函数，已移除
+// {
+//     // ... 实现已删除 ...
+// }
 
-    // 跳过PWM设置值
-    offset += 4; // 跳过PWM_SET1和PWM_SET2 (各2字节)
+// void SensorModule::parseWaterLevel(const QStringList& data, int& offset) // 旧的辅助解析函数，已移除
+// {
+//     // ... 实现已删除 ...
+// }
 
-    parseAirQuality(bytes, offset);
-    parseWaterQuality(bytes, offset);
-    parseWaterLevel(bytes, offset);
+// bool SensorModule::validateFrame(const QStringList& data) // 旧的校验函数，已移除
+// {
+//     // ... 实现已删除 ...
+//     return false;
+// }
 
-    emit sensorDataParsed(
-        co2(), ch2o(), tvoc(), pm25(), pm10(),
-        airTemperature(), humidity(),
-        turbidity(), ph(), tds(), waterTemperature(),
-        levelValue()
-        );
-    emit displayDataChanged();
-}
+// 处理来自DataSource的SensorDataDto更新的槽函数
+void SensorModule::handleSensorDataUpdated(const SensorDataDto& sensorData) {
+    // 更新内部存储以供QML显示，使用扁平化结构
+    m_displayData["co2"] = sensorData.co2;
+    m_displayData["ch2o"] = sensorData.ch2o;
+    m_displayData["tvoc"] = sensorData.tvoc;
+    m_displayData["pm25"] = sensorData.pm25;
+    m_displayData["pm10"] = sensorData.pm10;
+    m_displayData["airTemperature"] = sensorData.airTemperature;
+    m_displayData["airHumidity"] = sensorData.airHumidity; // 使用 airHumidity 键
+    m_displayData["waterTurbidity"] = sensorData.waterTurbidity; // 使用 waterTurbidity 键
+    m_displayData["ph"] = sensorData.ph;
+    m_displayData["tds"] = sensorData.tds; // 使用 tds 键
+    m_displayData["waterTemperature"] = sensorData.waterTemperature;
+    m_displayData["waterLevel"] = sensorData.waterLevel; // 使用 waterLevel 键
 
-void SensorModule::parseAirQuality(const QStringList& data, int& offset) {
-    QVariantMap air = m_displayData["air"].toMap();
-    bool ok;
+    // qDebug() << "SensorModule: Received SensorDataDto - CO2:" << sensorData.co2
+    //          << "AirTemp:" << sensorData.airTemperature
+    //          << "WaterLevel:" << sensorData.waterLevel;
 
-    // CO2 (2字节，低位在前)
-    int low = data[offset++].toInt(&ok, 16);
-    int high = data[offset++].toInt(&ok, 16);
-    air["co2"] = (high << 8) + low;
+    emit displayDataChanged(); // 发送信号通知QML更新视图
 
-    // CH2O (2字节，低位在前)
-    low = data[offset++].toInt(&ok, 16);
-    high = data[offset++].toInt(&ok, 16);
-    air["ch2o"] = (high << 8) + low;
-
-    // TVOC (2字节，低位在前)
-    low = data[offset++].toInt(&ok, 16);
-    high = data[offset++].toInt(&ok, 16);
-    air["tvoc"] = (high << 8) + low;
-
-    // PM2.5 (2字节，低位在前)
-    low = data[offset++].toInt(&ok, 16);
-    high = data[offset++].toInt(&ok, 16);
-    air["pm25"] = (high << 8) + low;
-
-    // PM10 (2字节，低位在前)
-    low = data[offset++].toInt(&ok, 16);
-    high = data[offset++].toInt(&ok, 16);
-    air["pm10"] = (high << 8) + low;
-
-    // 空气温度 (2字节分开处理)
-    int tempHigh = data[offset++].toInt(&ok, 16);
-    int tempLow = data[offset++].toInt(&ok, 16);
-    air["temperature"] = tempHigh + 0.01 * tempLow;
-
-    // 空气湿度 (2字节分开处理)
-    int humHigh = data[offset++].toInt(&ok, 16);
-    int humLow = data[offset++].toInt(&ok, 16);
-    air["humidity"] = humHigh + 0.01 * humLow;
-
-    m_displayData["air"] = air;
-}
-
-void SensorModule::parseWaterQuality(const QStringList& data, int& offset) {
-    QVariantMap water = m_displayData["water"].toMap();
-    bool ok;
-
-    // 浊度 (2字节，低位在前)
-    int low = data[offset++].toInt(&ok, 16);
-    int high = data[offset++].toInt(&ok, 16);
-    water["turbidity"] = (high << 8) + low;
-
-    // pH值 (2字节，低位在前)
-    low = data[offset++].toInt(&ok, 16);
-    high = data[offset++].toInt(&ok, 16);
-    water["ph"] = ((high << 8) + low) / 100.0;
-
-    // TDS (2字节，低位在前)
-    low = data[offset++].toInt(&ok, 16);
-    high = data[offset++].toInt(&ok, 16);
-    water["tds"] = (high << 8) + low;
-
-    // 水温 (2字节分开处理)
-    int tempHigh = data[offset++].toInt(&ok, 16);
-    int tempLow = data[offset++].toInt(&ok, 16);
-    water["temperature"] = tempHigh + 0.01 * tempLow;
-
-    m_displayData["water"] = water;
-}
-
-void SensorModule::parseWaterLevel(const QStringList& data, int& offset) {
-    QVariantMap level = m_displayData["level"].toMap();
-    bool ok;
-
-    // 液位值 (2字节，低位在前)
-    int low = data[offset++].toInt(&ok, 16);
-    int high = data[offset++].toInt(&ok, 16);
-    level["value"] = (high << 8) + low;
-
-    m_displayData["level"] = level;
+    emit sensorDataReadyForLog(sensorData); // 发送带有DTO的信号，用于数据库日志记录
 }

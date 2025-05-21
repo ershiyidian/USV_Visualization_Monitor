@@ -324,7 +324,8 @@ Rectangle {
                     Item { Layout.fillWidth: true }
 
                     Switch {
-                        checked: dataSource.pumpState
+                        // checked: dataSource.pumpState // 旧绑定
+                        checked: deviceModule.pumpActive // 新绑定到DeviceModule的pumpActive属性
 
                         indicator: Rectangle {
                             width: 50
@@ -354,7 +355,8 @@ Rectangle {
                             rightPadding: 60
                         }
 
-                        onCheckedChanged: dataSource.pumpState = checked
+                        // onCheckedChanged: dataSource.pumpState = checked // 旧的直接修改DataSource属性
+                        onCheckedChanged: deviceModule.setPumpActive(checked) // 新的调用DeviceModule的setter方法
                     }
                 }
 
@@ -380,7 +382,8 @@ Rectangle {
                             from: 675
                             to: 1353
                             stepSize: 1
-                            value: dataSource.motor1
+                            // value: dataSource.motor1 // 旧绑定
+                            value: deviceModule.motor1Value // 新绑定到DeviceModule的motor1Value属性
 
                             background: Rectangle {
                                 x: motor1Slider.leftPadding
@@ -411,10 +414,12 @@ Rectangle {
 
                             onValueChanged: {
                                 // 在中值附近时自动对齐到中值
+                                // 在中值附近时自动对齐到中值 (此逻辑可保留，因为它影响UI体验)
                                 if (Math.abs(value - 1013) < 10) {
                                     value = 1013;
                                 }
-                                dataSource.motor1 = value;
+                                // dataSource.motor1 = value; // 旧的直接修改DataSource属性
+                                deviceModule.setMotor1Value(value); // 新的调用DeviceModule的setter方法
                             }
                         }
 
@@ -443,7 +448,8 @@ Rectangle {
                             }
 
                             onClicked: {
-                                motor1Slider.value = 1013;
+                                // motor1Slider.value = 1013; // 旧的直接修改滑块值
+                                deviceModule.setMotor1Value(1013); // 新的调用DeviceModule的setter方法
                             }
 
                             background: Rectangle {
@@ -471,7 +477,8 @@ Rectangle {
                             from: 675
                             to: 1353
                             stepSize: 1
-                            value: dataSource.motor2
+                            // value: dataSource.motor2 // 旧绑定
+                            value: deviceModule.motor2Value // 新绑定到DeviceModule的motor2Value属性
 
                             background: Rectangle {
                                 x: motor2Slider.leftPadding
@@ -502,10 +509,12 @@ Rectangle {
 
                             onValueChanged: {
                                 // 中值对齐
+                                // 中值对齐 (此逻辑可保留)
                                 if (Math.abs(value - 1013) < 10) {
                                     value = 1013;
                                 }
-                                dataSource.motor2 = value;
+                                // dataSource.motor2 = value; // 旧的直接修改DataSource属性
+                                deviceModule.setMotor2Value(value); // 新的调用DeviceModule的setter方法
                             }
                         }
 
@@ -534,7 +543,8 @@ Rectangle {
                             }
 
                             onClicked: {
-                                motor2Slider.value = 1013;
+                                // motor2Slider.value = 1013; // 旧的直接修改滑块值
+                                deviceModule.setMotor2Value(1013); // 新的调用DeviceModule的setter方法
                             }
 
                             background: Rectangle {
@@ -569,8 +579,10 @@ Rectangle {
                         }
 
                         onClicked: {
-                            motor1Slider.value = 1013;
-                            motor2Slider.value = 1013;
+                            // motor1Slider.value = 1013; // 旧的直接修改滑块值
+                            // motor2Slider.value = 1013; // 旧的直接修改滑块值
+                            deviceModule.setMotor1Value(1013); // 调用DeviceModule的方法
+                            deviceModule.setMotor2Value(1013); // 调用DeviceModule的方法
                         }
                     }
 
@@ -593,8 +605,11 @@ Rectangle {
                         }
 
                         onClicked: {
-                            motor1Slider.value = 1353;
-                            motor2Slider.value = 1353;
+                            // motor1Slider.value = 1353; // 旧的直接修改滑块值
+                            // motor2Slider.value = 1353; // 旧的直接修改滑块值
+                            // 假设1353是电机最大值，后续可考虑从FrameConstants获取
+                            deviceModule.setMotor1Value(1353); // 调用DeviceModule的方法
+                            deviceModule.setMotor2Value(1353); // 调用DeviceModule的方法
                         }
                     }
                 }
